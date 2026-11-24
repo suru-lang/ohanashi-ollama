@@ -1,0 +1,186 @@
+# GitHub作業: 会話のリポジトリを砂場の作業フォルダに clone し、モデルが変えたものを commit して push する
+# git は手元(サーバー)で動かすので、コンテナに git や鍵がなくても、ネットワークがなくてもできる
+#   s で b に 倉群 を 署名 から 作業文脈作成する … 設定・砂場・会話のリポジトリ・署名から、道具を行うための文脈
+#   倉群 を 作業道具定義作成する          … モデルに渡す道具(github_clone と、読み書きのリポジトリがあれば github_push)
+#   名 が 作業道具名である                … github_clone か github_push か
+#   c で 呼出 を GitHub作業実行する        … 道具の呼び出し1つを行い、砂場内の道具結果 にする
+#   呼出 を 作業説明にする                … 画面に「clone しています」と出す短い文
+#   作業案内                              … モデルに渡す、clone と push の使い方の指示
+# 鍵は、git を動かすその時だけ、700 のフォルダに置いたファイルから環境変数(http.extraHeader)で渡す。
+# コマンドの文字列・.git/config・コンテナには入れない。
+
+「標準」 を 読み込んで 使う
+「JSON」 を 読み込んで 使う
+「ファイル」 を 読み込む
+「GitHub」 を 読み込んで 使う
+「GitHub道具」 を 読み込む
+「砂場」 を 読み込む
+「設定」 を 読み込む
+
+# 作業 は会話の作業フォルダ(コンテナの /work)、鍵場 は鍵と commit の文を一時に置くフォルダ(コンテナからは見えない)、
+# git基点 は clone する URL の頭、鍵 は GitHub の鍵、作者名・作者メール は commit に書く名前
+作業文脈 とは 窓口 と 倉群 と 署名 と 作業 と 鍵場 と git基点 と 鍵 と 作者名 と 作者メール の 組
+
+設定内の設定 で 砂場内の砂場 に GitHub道具内の倉許可 の リスト を 文字列 から 作業文脈作成する は 作業文脈 を 返す
+s で b に 群 を 署名 から 作業文脈作成する とは 窓口 は （s を GitHub道具内の窓口作成する） で 倉群 は 群 で 署名 は 署名 で 作業 は b の 作業 で 鍵場 は s の 作業 + 「/.鍵」 で git基点 は （s を 設定内のGit基点決定する） で 鍵 は s の GitHub鍵 で 作者名 は 名 で 作者メール は 便 の 作業文脈
+ただし 作者 とは s の Git作者
+ただし 利用者 とは s の GitHub利用者
+ただし 名 とは もし 作者 ≠ 「」 ならば （（作者 を 「 <」 で 分割する） の 先頭 を 空白除去する） そうでなければ もし 利用者 ≠ 「」 ならば 利用者 そうでなければ 「ohanashi-ollama」
+ただし 便 とは もし 作者 ≠ 「」 ならば （（作者 を 「 <」 で 分割する） の 最後 を 「>」 から 「」 へ 置換する） そうでなければ もし 利用者 ≠ 「」 ならば 利用者 + 「@users.noreply.github.com」 そうでなければ 「ohanashi-ollama@localhost」
+
+# --- 道具の定義 ---
+
+複製定義文 とは 「[{"type":"function","function":{"name":"github_clone","description":"Clone a GitHub repository into the sandbox at /work/<name> (only the latest commit), so that you can read and change its files with run and write_file. The sandbox has no GitHub credentials; use github_push to save your changes to GitHub.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"ref":{"type":"string","description":"Branch or tag to clone. Empty for the default branch"}},"required":["repo"]}}}]」
+
+送出定義文 とは 「[{"type":"function","function":{"name":"github_push","description":"Commit all changes in /work/<name> (the clone made by github_clone) and push them to a branch of a GitHub repository that is read and write in this conversation. Use a new branch name like ohanashi/fix-typo. You cannot push to the default branch, and force push is not possible. Then you can open a pull request with github_pr.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"branch":{"type":"string","description":"The branch to push to"},"message":{"type":"string","description":"The commit message"}},"required":["repo","branch","message"]}}}]」
+
+GitHub道具内の倉許可 の リスト を 作業道具定義作成する は JSON の リスト を 返す
+群 を 作業道具定義作成する とは もし 群 が 空 ならば 空 そうでなければ （複製定義文 を GitHub道具内の定義群にする） + （もし 群 が 書ける倉であること で 一部真である ならば 送出定義文 を GitHub道具内の定義群にする そうでなければ 空）
+
+GitHub道具内の倉許可 が 書ける倉である は 真偽 を 返す
+x が 書ける倉である とは x の 書込
+
+GitHub道具内の倉許可 が 読専である は 真偽 を 返す
+x が 読専である とは もし x の 書込 ならば 偽 そうでなければ 真
+
+文字列 が 作業道具名である は 真偽 を 返す
+名 が 作業道具名である とは 名 = 「github_clone」 または 名 = 「github_push」
+
+作業案内 とは 「GitHub のリポジトリのファイルを変えるときは、github_clone で /work に clone し、run と write_file で変えて確かめてから、github_push で新しい枝に push してください(コンテナの中では git push できません)。そのあと github_pr で PR を作れます。push と PR は、利用者に頼まれたときだけ行ってください。」
+
+JSON を 作業説明にする は 文字列 を 返す
+呼出 を 作業説明にする とは
+  もし 名 = 「github_clone」 ならば 「🐙 」 + 倉 + 「 を clone しています」
+  そうでなければ 「🐙 」 + 倉 + 「 の枝 」 + （呼出 から 「branch」 を GitHub道具内の引数文にする） + 「 に push しています」
+ただし 名 とは 呼出 を GitHub道具内の呼出名にする
+ただし 倉 とは 呼出 から 「repo」 を GitHub道具内の引数文にする
+
+# --- 道具を行う ---
+
+作業文脈 で JSON を GitHub作業実行する は 砂場内の道具結果 を 返す 入出力動作
+c で 呼出 を GitHub作業実行する とは
+  もし 先 が
+    x という 有 ならば c で x に 呼出 を 名 から 作業選択する
+    そうでなければ （名 で （「『」 + 指定 + 「』は、この会話では使えません。使えるのは 」 + （c の 倉群 を GitHub道具内の倉一覧文にする） + 「 です」） を GitHub道具内の書失敗結果にする） を 結果にする
+ただし 名 とは 呼出 を GitHub道具内の呼出名にする
+ただし 指定 とは 呼出 から 「repo」 を GitHub道具内の引数文にする
+ただし 先 とは もし 指定 = 「」 かつ c の 倉群 の 長さ = 1 ならば c の 倉群 の 先頭 の 有 そうでなければ c の 倉群 から 指定 を GitHub道具内の倉探索する
+
+作業文脈 で GitHub道具内の倉許可 に JSON を 文字列 から 作業選択する は 砂場内の道具結果 を 返す 入出力動作
+c で x に 呼出 を 名 から 作業選択する とは
+  もし 名 = 「github_clone」 ならば c で x を （呼出 から 「ref」 を GitHub道具内の引数文にする） から 複製実行する
+  そうでなければ もし 名 = 「github_push」 ならば c で x に （呼出 から 「branch」 を GitHub道具内の引数文にする） を （呼出 から 「message」 を GitHub道具内の引数文にする） から 送出実行する
+  そうでなければ （名 で （「知らない道具です: 」 + 名） を GitHub道具内の失敗結果にする） を 結果にする
+
+（砂場内の道具結果 と 文字列） の 成否 を 文字列 で 確定する は 砂場内の道具結果 を 返す
+（k という 成功） を 名 で 確定する とは k
+（e という 失敗） を 名 で 確定する とは 名 で e を GitHub道具内の書失敗結果にする
+
+# 「owner/名前」の「名前」。作業フォルダの中のこの名前のフォルダに clone する
+文字列 を 倉短名にする は 文字列 を 返す
+倉 を 倉短名にする とは （倉 を 「/」 で 分割する） の 最後
+
+作業文脈 で 文字列 を 場所にする は 文字列 を 返す
+c で 倉 を 場所にする とは c の 作業 + 「/」 + （倉 を 倉短名にする）
+
+# --- 鍵を渡す ---
+
+# 鍵を 700 のフォルダのファイルに書き、それを読んで消してから、git の http.extraHeader を環境変数で決める前置きのコマンド
+作業文脈 で 文字列 を 鍵前置作成する は 文字列 を 返す 入出力動作
+c で 名 を 鍵前置作成する とは
+  もし c の 鍵 = 「」 ならば 「export GIT_TERMINAL_PROMPT=0; 」 を 結果にする
+  そうでなければ c で 名 を 鍵書出する
+
+作業文脈 で 文字列 を 鍵書出する は 文字列 を 返す 入出力動作
+c で 名 を 鍵書出する とは 入出力手順
+  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 「ohanashi-鍵場」 で 砂場内の命令出力取得する
+  f とは c の 鍵場 + 「/git-」 + 名
+  （「T=」 + （c の 鍵 を 砂場内の引用する） + 改行） を f へ ファイル内の書出する
+  （「export GIT_TERMINAL_PROMPT=0; . 」 + （f を 砂場内の引用する） + 「; rm -f 」 + （f を 砂場内の引用する） + 「; H=$(printf 'x-access-token:%s' "$T" | base64 | tr -d '[:space:]'); unset T; export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: Basic $H"; 」） を 結果にする
+
+# --- github_clone ---
+
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 複製実行する は 砂場内の道具結果 を 返す 入出力動作
+c で x を 参照 から 複製実行する とは 入出力手順
+  r とは c で x を 参照 から 複製した 結果
+  （r を 「github_clone」 で 確定する） を 結果にする
+
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x を 参照 から 複製する とは 入出力手順
+  場 とは c で x の 倉 を 場所にする
+  短 とは x の 倉 を 倉短名にする
+  有無 とは （「test -e 」 + （場 を 砂場内の引用する）） を 「ohanashi-git-有無」 で 砂場内の命令出力取得した 結果
+  もし 有無 の 終了コード = 0 ならば （「github_clone」 で （「🐙 」 + x の 倉 + 「 は /work/」 + 短 + 「 に clone してあります」） を （「/work/」 + 短 + 「 is already there (cloned before). Change files there, then call github_push.」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
+  そうでなければ c で x を 参照 から 新規複製する
+
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 新規複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x を 参照 から 新規複製する とは 入出力手順
+  場 とは c で x の 倉 を 場所にする
+  短 とは x の 倉 を 倉短名にする
+  前 とは c で 「clone」 を 鍵前置作成した 結果
+  枝 とは もし 参照 = 「」 ならば 「」 そうでなければ 「--branch 」 + （参照 を 砂場内の引用する） + 「 」
+  場引 とは 場 を 砂場内の引用する
+  命令 とは 「(mkdir -p 」 + （c の 作業 を 砂場内の引用する） + 「 && (」 + 前 + 「git clone -q --depth 1 」 + 枝 + 「-- 」 + （（c の git基点 + 「/」 + x の 倉 + 「.git」） を 砂場内の引用する） + 「 」 + 場引 + 「) && git -C 」 + 場引 + 「 config user.name 」 + （c の 作者名 を 砂場内の引用する） + 「 && git -C 」 + 場引 + 「 config user.email 」 + （c の 作者メール を 砂場内の引用する） + 「 && git -C 」 + 場引 + 「 rev-parse --abbrev-ref HEAD)」
+  r とは 命令 を 「ohanashi-git-clone」 で 砂場内の命令出力取得した 結果
+  出 とは r の 出力 を 空白除去する
+  もし r の 終了コード ≠ 0 ならば （「clone できませんでした: 」 + 出） の 失敗 を 結果にする
+  そうでなければ （「github_clone」 で （「🐙 」 + x の 倉 + 「 を /work/」 + 短 + 「 に clone しました(枝 」 + （出 を 最終行にする） + 「)」） を （「Cloned 」 + x の 倉 + 「 into /work/」 + 短 + 「 (branch 」 + （出 を 最終行にする） + 「). Change files there with run and write_file, then call github_push to save them.」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
+
+文字列 を 最終行にする は 文字列 を 返す
+s を 最終行にする とは （s を 改行 で 分割する） の 最後 を 空白除去する
+
+# --- github_push ---
+
+作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 から 送出実行する は 砂場内の道具結果 を 返す 入出力動作
+c で x に 枝 を 文 から 送出実行する とは 入出力手順
+  r とは c で x に 枝 を 文 から 送出確認した 結果
+  （r を 「github_push」 で 確定する） を 結果にする
+
+作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 から 送出確認する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x に 枝 を 文 から 送出確認する とは
+  もし x が 読専である ならば （x を GitHub道具内の読専理由にする） の 失敗 を 結果にする
+  そうでなければ もし 枝 が 枝形違いである ならば （「branch『」 + 枝 + 「』は使えません。英数字と - _ . / で、ohanashi/fix-typo のような名前にしてください」） の 失敗 を 結果にする
+  そうでなければ もし 文 = 「」 ならば 「message(commit の文)が要ります」 の 失敗 を 結果にする
+  そうでなければ c で x に 枝 を 文 から 既定枝確認する
+
+作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 から 既定枝確認する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x に 枝 を 文 から 既定枝確認する とは 入出力手順
+  既定 とは c の 窓口 で x の 倉 を GitHub道具内の既定枝取得した 中身
+  もし 枝 = 既定 ならば （「既定の枝(」 + 既定 + 「)には push しません。ohanashi/fix-typo のような新しい枝の名前にして、github_pr で PR を作ってください」） の 失敗 を 結果にする
+  そうでなければ c で x に 枝 を 文 から 送出する
+
+作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 から 送出する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x に 枝 を 文 から 送出する とは 入出力手順
+  場 とは c で x の 倉 を 場所にする
+  短 とは x の 倉 を 倉短名にする
+  有無 とは （「test -d 」 + （（場 + 「/.git」） を 砂場内の引用する）） を 「ohanashi-git-有無」 で 砂場内の命令出力取得した 結果
+  もし 有無 の 終了コード ≠ 0 ならば （「/work/」 + 短 + 「 がありません。先に github_clone で clone してください」） の 失敗 を 結果にする
+  そうでなければ c で x に 枝 を 文 から 送出実施する
+
+作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 から 送出実施する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x に 枝 を 文 から 送出実施する とは 入出力手順
+  場 とは c で x の 倉 を 場所にする
+  短 とは x の 倉 を 倉短名にする
+  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 「ohanashi-鍵場」 で 砂場内の命令出力取得する
+  文道 とは c の 鍵場 + 「/msg-」 + 短
+  （（文 に （c の 署名） を GitHub道具内の署名付加する） + 改行） を 文道 へ ファイル内の書出する
+  前 とは c で 「push」 を 鍵前置作成した 結果
+  g とは 「git -C 」 + （場 を 砂場内の引用する） + 「 」
+  命令 とは 「(」 + g + 「checkout -q -B 」 + （枝 を 砂場内の引用する） + 「 && 」 + g + 「add -A && { 」 + g + 「diff --cached --quiet || 」 + g + 「-c core.hooksPath=/dev/null commit -q -F - < 」 + （文道 を 砂場内の引用する） + 「; } && n=$(」 + g + 「rev-list --count HEAD --not --remotes) && if [ "$n" = 0 ]; then echo 'ohanashi: nothing to push'; exit 3; fi && 」 + g + 「log -1 --format=%h && 」 + g + 「show --shortstat --format= HEAD && (」 + 前 + g + 「push -q origin HEAD:refs/heads/」 + （枝 を 砂場内の引用する） + 「) && 」 + g + 「update-ref refs/remotes/origin/」 + （枝 を 砂場内の引用する） + 「 HEAD)」
+  r とは 命令 を 「ohanashi-git-push」 で 砂場内の命令出力取得した 結果
+  （「rm -f 」 + （文道 を 砂場内の引用する）） を 「ohanashi-git-rm」 で 砂場内の命令出力取得する
+  行群 とは （r の 出力 を 空白除去して 改行 で 分割する） の それぞれ を 空白除去する
+  印 とは もし 行群 が 空 ならば 「」 そうでなければ 行群 の 先頭
+  量 とは もし 行群 の 長さ < 2 ならば 「」 そうでなければ 行群 から 2 を 番目取得する
+  もし r の 終了コード = 3 ならば （「push する変更がありません。/work/」 + 短 + 「 のファイルを変えてから呼んでください」） の 失敗 を 結果にする
+  そうでなければ もし r の 終了コード ≠ 0 ならば （「push できませんでした: 」 + （r の 出力 を 空白除去する）） の 失敗 を 結果にする
+  そうでなければ （「github_push」 で （「🐙 」 + x の 倉 + 「 の枝 」 + 枝 + 「 に push しました(」 + 印 + 「、」 + 量 + 「)」） を （「Pushed commit 」 + 印 + 「 to branch 」 + 枝 + 「 of 」 + x の 倉 + 「 (」 + 量 + 「). You can open a pull request with github_pr (branch 」 + 枝 + 「).」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
+
+# 枝の名前: 英数字と - _ . /。「-」「/」「.」で始めない、「/」「.」「.lock」で終えない、「..」「//」を含まない
+文字列 が 枝形違いである は 真偽 を 返す
+s が 枝形違いである とは s = 「」 または s の 長さ > 200 または （（s を 文字分解する） が 枝字であること で 全部真である） が 偽 または s が 「-」 で 先頭一致である または s が 「/」 で 先頭一致である または s が 「.」 で 先頭一致である または s が 「/」 で 末尾一致である または s が 「.」 で 末尾一致である または s が 「.lock」 で 末尾一致である または s が 「..」 を 含有である または s が 「//」 を 含有である または s が 「/.」 を 含有である
+
+文字列 が 枝字である は 真偽 を 返す
+c が 枝字である とは （c >= 「A」 かつ c <= 「Z」） または （c >= 「a」 かつ c <= 「z」） または （c >= 「0」 かつ c <= 「9」） または c = 「-」 または c = 「_」 または c = 「.」 または c = 「/」
+
+複製定義文 と 送出定義文 と 書ける倉である と 読専である と 作業選択する と 確定する と 倉短名にする と 場所にする と 鍵前置作成する と 鍵書出する と 複製実行する と 複製する と 新規複製する と 最終行にする と 送出実行する と 送出確認する と 既定枝確認する と 送出する と 送出実施する と 枝字である は 非公開とする
