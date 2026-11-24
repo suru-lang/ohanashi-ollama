@@ -46,7 +46,7 @@ x が 読専である とは もし x の 書込 ならば 偽 そうでなけ�
 文字列 が 作業道具名である は 真偽 を 返す
 名 が 作業道具名である とは 名 = 「github_clone」 または 名 = 「github_push」
 
-作業案内 とは 「GitHub のリポジトリのファイルを変えるときは、github_clone で /work に clone し、run と write_file で変えて確かめてから、github_push で新しい枝に push してください(コンテナの中では git push できません)。そのあと github_pr で PR を作れます。push と PR は、利用者に頼まれたときだけ行ってください。」
+作業案内 とは 「GitHub のリポジトリのファイルを変えるときは、github_clone で /work に clone し、run と write_file で変えて確かめてから、github_push で新しい枝に push してください(コンテナの中には鍵がないので、git clone や git push はしないでください。clone したフォルダは /work/名前 です)。そのあと github_pr で PR を作れます。push と PR は、利用者に頼まれたときだけ行ってください。」
 
 JSON を 作業説明にする は 文字列 を 返す
 呼出 を 作業説明にする とは

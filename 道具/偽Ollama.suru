@@ -13,7 +13,7 @@
 #                       道具に github_issue があり、最後の問いが「issue を作って」を含むなら o/r に issue を作る、
 #                       「issue を閉じて」を含むなら o/r の #1 を閉じる道具の呼び出しを返す。
 #                       同じように「clone して」で github_clone、「push して」で ohanashi/test へ、「main に push して」で main へ github_push、
-#                       「PR を作って」で ohanashi/test から github_pr
+#                       「PR を作って」で ohanashi/test から github_pr、「git push して」で run の git push
 #   GET  /user・/repos/o/r/… … GitHub の API の代わり(--github-api でここを指す)。/user は Authorization が「Bearer 試し鍵」でなければ 401
 #   POST /repos/o/r/issues・PATCH /repos/o/r/issues/1・POST /repos/o/r/pulls … issue #7 を作った・#1 を直した・PR #12 を作った答え。title に、届いた本文の JSON をそのまま入れる
 #   POST /api/web_search … 見出し Authorization が「Bearer 試し鍵」なら、問いを題に入れた2つの結果を返す。違えば 401
@@ -89,6 +89,7 @@ j が GitHub番である とは 役 = 「user」 かつ 内容 が 「GitHub」 
 JSON を 書番にする は 文字列 を 返す
 j を 書番にする とは
   もし 役 ≠ 「user」 ならば 「」
+  そうでなければ もし 道具文 が 「"name":"run"」 を 含有である かつ 内容 が 「git push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run","arguments":{"command":"cd /work && git push -u origin main"}}}]},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_clone"」 を 含有である かつ 内容 が 「clone して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_clone","arguments":{"repo":"o/r"}}}]},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「main に push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"main","message":"直す"}}}]},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"ohanashi/test","message":"README を直す"}}}]},"done":false}」

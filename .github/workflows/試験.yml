@@ -236,6 +236,8 @@ jobs:
           [ "$(git --git-dir 出力/裸/o/r.git rev-parse main)" = "$(git -C 出力/種 rev-parse HEAD)" ]
           [ -z "$(ls -A 出力/作業G/.鍵)" ]
           話す 'push して' | grep -F '"summary":"🐙 書けませんでした: push する変更がありません。'
+          # コンテナの中の git push は動かさず、github_push を使うように返す
+          話す 'git push して' | grep -F 'git push はできません。GitHub に保存するときは、道具 github_clone で clone したもの'
           # PR を作る(偽の GitHub は、届いた本文を title に入れて返す)
           話す 'PR を作って' | tee 出力/git答え3
           grep -F '"summary":"🐙 o/r に PR [#12](https://github.com/o/r/pull/12) を作りました: README を直す(ohanashi/test → main)"' 出力/git答え3
