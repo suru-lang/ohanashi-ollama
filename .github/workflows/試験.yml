@@ -96,6 +96,27 @@ jobs:
               console.log(答え, 考え);
               process.exit(答え.startsWith("おうむ返し: ") && 考え === "ふむふむ" ? 0 : 1);
             };'
+          # スレッド: 会話の設定(指示)は全部のスレッドに効き、モデルにはそのスレッドの発言だけが届く
+          curl -s -X PUT -d '{"model":"偽","system":"短く"}' $B/api/conversations/1 > /dev/null
+          curl -s $B/api/conversations/1 | grep -F '"threads":[{"id":1,"title":"やあ"'
+          curl -s -X POST -d '{}' $B/api/conversations/1/threads | tee 出力/スレッド | grep -F '"conversation":1,"title":"","messages":[]'
+          T=$(sed 's/^{"id":\([0-9]*\),.*/\1/' 出力/スレッド)
+          curl -s -X POST -d '{"role":"user","content":"発言の数は"}' $B/api/threads/$T/messages | grep -F '"title":"発言の数は"'
+          curl -s -X POST -d "{\"thread\":$T}" $B/api/chat | tee 出力/スレッド答え
+          [ "$(grep -o '"content":"[^"]*"' 出力/スレッド答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: 発言の数は [指示: 短く] [問い 1]" ]
+          # 前の道({"conversation":番号}・/messages)は一番新しいスレッドのこと
+          curl -s -X POST -d '{"role":"assistant","content":"答え"}' $B/api/conversations/1/messages | grep -F '"messages":[{"role":"user","content":"発言の数は"},{"role":"assistant","content":"答え"}]'
+          curl -s -X POST -d '{"role":"user","content":"発言の数は?"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat > 出力/スレッド答え2
+          grep -o '"content":"[^"]*"' 出力/スレッド答え2 | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[問い 2]'
+          curl -s -X DELETE $B/api/threads/$T/last-answer | grep -F '"content":"発言の数は?"}]}'
+          curl -s -X PUT -d '{"title":"二つ目"}' $B/api/threads/$T | grep -F '"title":"二つ目"'
+          curl -s -X POST -d '{"q":"発言の数"}' $B/api/search | grep -F "\"thread\":$T,"
+          curl -s $B/api/conversations | grep -F '"threads":2'
+          curl -s -X DELETE $B/api/threads/$T | grep -F '{"deleted":true}'
+          curl -s -o /dev/null -w '%{http_code}\n' -X DELETE $B/api/threads/1 | grep -x 404
+          curl -s -o /dev/null -w '%{http_code}\n' $B/api/threads/999 | grep -x 404
+          curl -s -X POST -d '{"thread":999}' $B/api/chat | grep -F '{"error":"その会話かスレッドはありません"}'
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           kill %1 %2
       - name: 偽の GitHub を相手に、会話のリポジトリを読む

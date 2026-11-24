@@ -212,7 +212,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | ファイル | 中身 |
 |---|---|
 | [本体.suru](本体.suru) | サーバー。道ごとの答え、WebSocket、Ollama の答えをブラウザへ流すところ |
-| [会話帳.suru](会話帳.suru) | 会話と発言を SQLite にしまう |
+| [会話帳.suru](会話帳.suru) | 会話とスレッドと発言を SQLite にしまう |
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
@@ -231,13 +231,16 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET /api/github/repos` | 会話に足すリポジトリの候補(鍵で使えるもの。`--github-repos` があればそれに入るものだけ) `{"repos":[…]}` |
 | `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"github":真偽,"githubRepos":[…],"githubUser":…}` |
 | `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
-| `GET /api/conversations` | 会話の一覧(新しく話した順) |
-| `POST /api/search` | 題か発言に言葉を含む会話 `{"q":…}` → `[{"id":…,"title":…,"snippet":…}, …]` |
-| `POST /api/conversations` | 会話を作る `{"model":…}` |
-| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)を変える・消す |
-| `POST /api/conversations/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
-| `DELETE /api/conversations/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
+| `GET /api/conversations` | 会話の一覧(新しく話した順。`"threads"` はスレッドの数) |
+| `POST /api/search` | 題か発言に言葉を含むスレッド `{"q":…}` → `[{"id":会話,"thread":スレッド,"title":…,"threadTitle":…,"snippet":…}, …]` |
+| `POST /api/conversations` | 会話を1つ目のスレッドといっしょに作る `{"model":…}` |
+| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身(設定と `"threads":[{"id":…,"title":…,"updated":…}]`)を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)を変える・消す(スレッドと発言も消える) |
+| `GET・POST /api/conversations/番号/threads` | スレッドの一覧・スレッドを作る `{"title":…}`(省ける) |
+| `GET・PUT・DELETE /api/threads/番号` | スレッドの中身 `{"id":…,"conversation":…,"title":…,"messages":[…]}` を読む・題を変える・消す(会話の最後のスレッドは消せない) |
+| `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
+| `DELETE /api/threads/番号/last-answer` | 最後の答えを消す(作り直すとき) |
+| `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しいスレッドに発言を足す・最後の答えを消して、会話の中身(`"messages"` は一番新しいスレッドの発言)を返す |
+| `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
 流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
@@ -252,6 +255,16 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 4. **考えは保存しない。** 考えるモデルの考え(`thinking`)は画面に出すだけで、次に送る発言には入れません(Ollama の勧めのとおり)。
 5. **検索は LIKE で。** 題か発言の中身に言葉を含む会話を、新しく話した順に 100 まで返します。`%`・`_`・`\` はただの文字として探し、英字の大文字小文字は区別しません。最初に見つかった発言の、言葉のまわりを抜き出して一覧に出します。
 6. **要求ごとにデータベースを開いて閉じる。** 答えを流している間はデータベースを開いたままにしません。同時の書き込みは `busy_timeout` で待ちます。
+
+### スレッド
+
+1. **会話の下にスレッドを置く。** Claude のプロジェクトのように、会話は設定(モデル・指示・温度・砂場のネットワーク・GitHub のリポジトリ)の入れ物にし、話題ごとにスレッドを作って話します。表 `スレッド`(番号・会話・題・作成・更新)を足し、`発言` に `スレッド` の列を足しました。設定は会話にあるので、新しいスレッドでもリポジトリなどを足し直さずに使えます。
+2. **モデルに送るのはスレッドの発言だけ。** 会話の指示は今までどおり先頭に入れますが、ほかのスレッドの発言は送りません。長い会話は、送る文が長くなって答えはじめるまでが遅くなり、前の話題や失敗にも引きずられるためです。前の答えで push・PR をしたか(「push・PR のあとに確かめさせ、できていなければやり直させる」の項目など)も、そのスレッドの中で見ます。
+3. **前の版の会話は1つ目のスレッドに移す。** 起動したときに、スレッドのない会話ごとにスレッドを1つ(題は会話の題)作り、スレッドの決まっていない発言をそこに付けます。何度起動しても、2回目からは何もしません。
+4. **砂場と作業フォルダは会話ごと。** コンテナ(`ohanashi-ポート-会話の番号`)も `作業/会話の番号` も変えません。前のスレッドで clone したリポジトリを、次のスレッドで直して push できます。そのかわり、2つのスレッドで同時に砂場を使うと、同じコンテナを使います。
+5. **前の道も残す。** `/api/conversations/番号/messages`・`/last-answer` と WebSocket の `{"conversation":番号}` は、その会話の一番新しく作ったスレッドのこととして動きます。開いたままの前の版の画面でも話せるようにするためです。
+6. **題はスレッドごと。** スレッドに最初の問いを足すと、その1行目のはじめの 40 文字をスレッドの題にします(会話の題が空なら、会話の題にも)。
+7. **会話の最後のスレッドは消せない。** スレッドのない会話を作らないように、最後の1つを消すときは会話ごと消します。
 
 ### 画面
 
