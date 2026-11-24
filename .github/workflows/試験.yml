@@ -263,11 +263,16 @@ jobs:
           grep -F '直しました\\n\\n— ohanashi-ollama(偽) で書きました' 出力/git答え3.文
           # PR を作れていれば、作れていないという知らせは出さない
           if grep -F 'PR を作れていません' 出力/git答え3; then exit 1; fi
-          # 道具を使わずに PR を作ったと答えたら、作れていないと知らせる
+          # 道具を使わずに PR を作ったと答えたら、道具を使うように一度だけ頼み直す
           話す 'PR を作ったと言って' | tee 出力/git答え4
           grep -F 'Pull Request #2' 出力/git答え4
-          grep -F '"notice":"⚠ この答えの中で、PR を作る道具(github_pr)は PR を作れていません' 出力/git答え4
-          話す 'push したと言って' | grep -F '"notice":"⚠ この答えの中で、push する道具(github_push)は push していません'
+          grep -F '"notice":"⚠ モデルが道具を使わずに『できた』と書いたので' 出力/git答え4
+          grep -F '"content":"すみません、まだ PR を作っていません"' 出力/git答え4
+          if grep -F 'PR を作れていません' 出力/git答え4; then exit 1; fi
+          # 頼み直しても、道具を使わずにできたと答えたら、できていないと知らせる
+          話す 'push したと言い張って' | tee 出力/git答え5
+          [ "$(grep -c '"notice":"⚠ モデルが道具を使わずに' 出力/git答え5)" = 1 ]
+          grep -F '"notice":"⚠ この答えの中で、push する道具(github_push)は push していません' 出力/git答え5
           # 前の答えに画面が足した道具の跡は、モデルに送らない
           curl -s -X POST --data-binary @- $B/api/conversations/1/messages > /dev/null <<'跡'
           {"role":"assistant","content":"見ます\n\n~~~~console\n$ ls\na.py\n~~~~\n\n\u2063道具:run\n\n🐙 o/r の枝 a に push しました(abc)\n\u2063道具:github_push\n\nできました"}
