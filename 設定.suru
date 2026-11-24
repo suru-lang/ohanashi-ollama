@@ -12,8 +12,9 @@
 # GitHub鍵 は GitHub の鍵(モデル・画面・砂場には渡さない)、GitHub倉群 は使ってよいリポジトリ(「owner/名前」か「owner/*」。空なら GitHub は使わない)、
 # GitHub基点 は GitHub の API の基点、GitHub利用者 は起動のときに鍵で確かめた利用者の名前、
 # Git基点 は clone・push する URL の頭(「」なら GitHub基点 から決める)、Git作者 は commit の「名前 <メール>」(「」なら GitHub利用者 から決める)
+# 待受 は画面を開くアドレス(既定の「127.0.0.1」なら同じ機械の中からだけ。「0.0.0.0」ならほかの機械からも)
 # 制御 は 起動.sh と話すフォルダ(「」なら画面から再起動できない)、改訂 は動いているコミット(起動.sh が渡す)、起動時 は動き始めた時刻(画面が、動かし直したかを知るため)
-設定 とは 基点 と ポート と 帳 と 画面 と SearXNG と 検索鍵 と 検索先 と 砂像 と 砂網 と 作業 と 制御 と 改訂 と 起動時 と GitHub鍵 と GitHub倉群 と GitHub基点 と GitHub利用者 と Git基点 と Git作者 の 組
+設定 とは 基点 と 待受 と ポート と 帳 と 画面 と SearXNG と 検索鍵 と 検索先 と 砂像 と 砂網 と 作業 と 制御 と 改訂 と 起動時 と GitHub鍵 と GitHub倉群 と GitHub基点 と GitHub利用者 と Git基点 と Git作者 の 組
 
 既定検索先 とは 「https://ollama.com/api/web_search」
 既定砂像 とは 「python:3.12-slim」
@@ -27,7 +28,7 @@
   鍵 とは 「OLLAMA_API_KEY」 を 環境内の環境変数取得した 結果
   探 とは 「SEARXNG_URL」 を 環境内の環境変数取得した 結果
   GH鍵 とは 「GITHUB_TOKEN」 を 環境内の環境変数取得した 結果
-  （基点 は （環境値 を 基点にする） で ポート は 8080 で 帳 は 「ohanashi.db」 で 画面 は 「画面」 で SearXNG は （探 を 末尾斜線除去する） で 検索鍵 は 鍵 で 検索先 は 既定検索先 で 砂像 は 既定砂像 で 砂網 は 「none」 で 作業 は 「作業」 で 制御 は 「」 で 改訂 は 「」 で 起動時 は 0 で GitHub鍵 は GH鍵 で GitHub倉群 は 空 で GitHub基点 は 既定GitHub基点 で GitHub利用者 は 「」 で Git基点 は 「」 で Git作者 は 「」 の 設定） を 結果にする
+  （基点 は （環境値 を 基点にする） で 待受 は 「127.0.0.1」 で ポート は 8080 で 帳 は 「ohanashi.db」 で 画面 は 「画面」 で SearXNG は （探 を 末尾斜線除去する） で 検索鍵 は 鍵 で 検索先 は 既定検索先 で 砂像 は 既定砂像 で 砂網 は 「none」 で 作業 は 「作業」 で 制御 は 「」 で 改訂 は 「」 で 起動時 は 0 で GitHub鍵 は GH鍵 で GitHub倉群 は 空 で GitHub基点 は 既定GitHub基点 で GitHub利用者 は 「」 で Git基点 は 「」 で Git作者 は 「」 の 設定） を 結果にする
 
 # OLLAMA_HOST は「127.0.0.1:11434」や「0.0.0.0」のようにも書けるので、http:// とポートを補う。0.0.0.0 は 127.0.0.1 にする
 文字列 を 基点にする は 文字列 を 返す
@@ -41,7 +42,7 @@ v を 基点にする とは
 文字列 を 末尾斜線除去する は 文字列 を 返す
 v を 末尾斜線除去する とは もし v が 「/」 で 末尾一致である ならば v から （v の 長さ - 1） を 先頭取得する そうでなければ v
 
-使い方 とは 「使い方: ohanashi-ollama [--ollama URL] [--port ポート] [--db ファイル] [--screen フォルダ] [--searxng URL] [--web-search URL] [--sandbox-image イメージ] [--sandbox-network ネットワーク] [--work フォルダ] [--control フォルダ] [--revision 版] [--github-repos owner/名前,owner/*] [--github-token 鍵] [--github-api URL]」
+使い方 とは 「使い方: ohanashi-ollama [--ollama URL] [--listen アドレス] [--port ポート] [--db ファイル] [--screen フォルダ] [--searxng URL] [--web-search URL] [--sandbox-image イメージ] [--sandbox-network ネットワーク] [--work フォルダ] [--control フォルダ] [--revision 版] [--github-repos owner/名前,owner/*] [--github-token 鍵] [--github-api URL]」
 
 # 「--名前 値」を前から順に読む
 文字列 の リスト を 設定 で 引数解釈する は （設定 と 文字列） の 成否 を 返す
@@ -53,6 +54,7 @@ v を 末尾斜線除去する とは もし v が 「/」 で 末尾一致で�
 設定 に 文字列 の リスト を 項目設定する は （設定 と 文字列） の 成否 を 返す
 s に 名 と 値 を 項目設定する とは
   もし 名 = 「--ollama」 ならば （基点 は （値 を 基点にする） の s） の 成功
+  そうでなければ もし 名 = 「--listen」 ならば （待受 は 値 の s） の 成功
   そうでなければ もし 名 = 「--port」 ならば （値 を 数値確認する） を （n を 受け取って （ポート は n の s） を 返すこと） で 写像する
   そうでなければ もし 名 = 「--db」 ならば （帳 は 値 の s） の 成功
   そうでなければ もし 名 = 「--screen」 ならば （画面 は 値 の s） の 成功
