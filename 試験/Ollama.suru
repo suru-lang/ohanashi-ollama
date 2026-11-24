@@ -28,7 +28,7 @@ x を 通知文にする とは 「無言」
 本文試験する は 真偽 を 返す 入出力動作
 本文試験する とは 入出力手順
   群 とは （役 は 「user」 で 内容 は 「やあ」 の 会話帳内の発言） を 空 に 挿入する
-  c とは 番号 は 1 で 題 は 「t」 で モデル は 「llama3.2」 で 指示 は 「」 で 温度 は -1 の 会話帳内の会話
+  c とは 番号 は 1 で 題 は 「t」 で モデル は 「llama3.2」 で 指示 は 「」 で 温度 は -1 で 網 は 0 の 会話帳内の会話
   （c で 群 を Ollama内の要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"user","content":"やあ"}],"stream":true}」 に 一致確認する
   d とは 指示 は 「短く」 で 温度 は 0.5 の c
   （d で 群 を Ollama内の要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"system","content":"短く"},{"role":"user","content":"やあ"}],"stream":true,"options":{"temperature":0.5}}」 に 一致確認する
