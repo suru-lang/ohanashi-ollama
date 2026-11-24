@@ -32,7 +32,7 @@ s で b に 群 を 署名 から 作業文脈作成する とは 窓口 は （
 
 # --- 道具の定義 ---
 
-複製定義文 とは 「[{"type":"function","function":{"name":"github_clone","description":"Clone a GitHub repository into the sandbox at /work/<name> (only the latest commit), so that you can read and change its files with run and write_file. The sandbox has no GitHub credentials; use github_push to save your changes to GitHub.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"ref":{"type":"string","description":"Branch or tag to clone. Empty for the default branch"}},"required":["repo"]}}}]」
+複製定義文 とは 「[{"type":"function","function":{"name":"github_clone","description":"Clone a GitHub repository into the sandbox at /work/<name> (only the latest commit), so that you can read and change its files with run and write_file. The sandbox has no GitHub credentials; use github_push to save your changes to GitHub.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"ref":{"type":"string","description":"Branch or tag to clone. Empty for the default branch"},"fresh":{"type":"boolean","description":"Clone again even if /work/<name> is already there. The old folder is moved to /work/<name>.old-<time>. Use this when its history is not from this repository (for example github_pr says the branch has no history in common)"}},"required":["repo"]}}}]」
 
 送出定義文 とは 「[{"type":"function","function":{"name":"github_push","description":"Commit all changes in /work/<name> (the clone made by github_clone) and push them to a branch of a GitHub repository that is read and write in this conversation. Use a new branch name like ohanashi/fix-typo. You cannot push to the default branch (except the first commit of an empty repository), and force push is not possible. Then you can open a pull request with github_pr.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"branch":{"type":"string","description":"The branch to push to"},"message":{"type":"string","description":"The commit message"}},"required":["repo","branch","message"]}}}]」
 
@@ -70,7 +70,7 @@ c で 呼出 を GitHub作業実行する とは
 
 作業文脈 で GitHub道具内の倉許可 に JSON を 文字列 から 作業選択する は 砂場内の道具結果 を 返す 入出力動作
 c で x に 呼出 を 名 から 作業選択する とは
-  もし 名 = 「github_clone」 ならば c で x を （呼出 から 「ref」 を GitHub道具内の引数文にする） から 複製実行する
+  もし 名 = 「github_clone」 ならば c で x を （呼出 から 「ref」 を GitHub道具内の引数文にする） から （（（呼出 を GitHub道具内の呼出引数にする） から 「fresh」 を JSON取得する） を GitHub道具内の真偽値にする） へ 複製実行する
   そうでなければ もし 名 = 「github_push」 ならば c で x に （呼出 から 「branch」 を GitHub道具内の引数文にする） を （呼出 から 「message」 を GitHub道具内の引数文にする） から 送出実行する
   そうでなければ （名 で （「知らない道具です: 」 + 名） を GitHub道具内の失敗結果にする） を 結果にする
 
@@ -102,18 +102,42 @@ c で 名 を 鍵書出する とは 入出力手順
 
 # --- github_clone ---
 
-作業文脈 で GitHub道具内の倉許可 を 文字列 から 複製実行する は 砂場内の道具結果 を 返す 入出力動作
-c で x を 参照 から 複製実行する とは 入出力手順
-  r とは c で x を 参照 から 複製した 結果
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 真偽 へ 複製実行する は 砂場内の道具結果 を 返す 入出力動作
+c で x を 参照 から 改 へ 複製実行する とは 入出力手順
+  r とは c で x を 参照 から 改 へ 複製した 結果
   （r を 「github_clone」 で 確定する） を 結果にする
 
-作業文脈 で GitHub道具内の倉許可 を 文字列 から 複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
-c で x を 参照 から 複製する とは 入出力手順
+# 改(fresh)が真なら、もうある clone を /work/名前.old-時刻 に移してから clone し直す
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 真偽 へ 複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x を 参照 から 改 へ 複製する とは 入出力手順
   場 とは c で x の 倉 を 場所にする
   短 とは x の 倉 を 倉短名にする
   有無 とは （「test -e 」 + （場 を 砂場内の引用する）） を 「ohanashi-git-有無」 で 砂場内の命令出力取得した 結果
-  もし 有無 の 終了コード = 0 ならば （「github_clone」 で （「🐙 」 + x の 倉 + 「 は /work/」 + 短 + 「 に clone してあります」） を （「/work/」 + 短 + 「 is already there (cloned before). Change files there, then call github_push.」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
-  そうでなければ c で x を 参照 から 新規複製する
+  もし 有無 の 終了コード ≠ 0 ならば c で x を 参照 から 新規複製する
+  そうでなければ もし 改 ならば c で x を 参照 から 移して複製する
+  そうでなければ （「github_clone」 で （「🐙 」 + x の 倉 + 「 は /work/」 + 短 + 「 に clone してあります」） を （「/work/」 + 短 + 「 is already there (cloned before). Change files there, then call github_push. If its history is not from this repository (for example github_pr says the branch has no history in common), call github_clone with fresh true.」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
+
+作業文脈 で GitHub道具内の倉許可 を 文字列 から 移して複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+c で x を 参照 から 移して複製する とは 入出力手順
+  場引 とは （c で x の 倉 を 場所にする） を 砂場内の引用する
+  m とは （「d=」 + 場引 + 「.old-$(date +%Y%m%d%H%M%S) && mv 」 + 場引 + 「 "$d" && basename "$d"」） を 「ohanashi-git-移動」 で 砂場内の命令出力取得した 結果
+  旧 とは （m の 出力 を 空白除去する） を 最終行にする
+  もし m の 終了コード ≠ 0 ならば （「前の clone を移せませんでした: 」 + （m の 出力 を 空白除去する）） の 失敗 を 結果にする
+  そうでなければ （c で x を 参照 から 新規複製した 結果） を 旧 で 旧注付加する
+
+（砂場内の道具結果 と 文字列） の 成否 を 文字列 で 旧注付加する は （砂場内の道具結果 と 文字列） の 成否 を 返す
+（k という 成功） を 旧 で 旧注付加する とは （k を 旧 で 旧注結果にする） の 成功
+e を 旧 で 旧注付加する とは e
+
+砂場内の道具結果 を 文字列 で 旧注結果にする は 砂場内の道具結果 を 返す
+k を 旧 で 旧注結果にする とは 画面 は （「github_clone」 で （（（k の 画面） から 「summary」 を JSON取得して 要約文取得する） + 「。前のものは /work/」 + 旧 + 「 に移しました」） を 画面JSONにする） で 返答 は （k の 返答 + 「 The old folder was moved to /work/」 + 旧 + 「; copy your changed files from there into the new clone, then call github_push with a new branch.」） の 砂場内の道具結果
+
+JSON を 要約文取得する は 文字列 を 返す
+（t という JSON文字列） を 要約文取得する とは t
+v を 要約文取得する とは 「」
+
+文字列 で 文字列 を 画面JSONにする は JSON を 返す
+名 で 要約 を 画面JSONにする とは （（「name」 と （名 の JSON文字列） の JSON項目） と （「summary」 と （要約 の JSON文字列） の JSON項目）） の JSON物
 
 作業文脈 で GitHub道具内の倉許可 を 文字列 から 新規複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
 c で x を 参照 から 新規複製する とは 入出力手順
@@ -271,4 +295,4 @@ s が 枝形違いである とは s = 「」 または s の 長さ > 200 ま�
 文字列 が 枝字である は 真偽 を 返す
 c が 枝字である とは （c >= 「A」 かつ c <= 「Z」） または （c >= 「a」 かつ c <= 「z」） または （c >= 「0」 かつ c <= 「9」） または c = 「-」 または c = 「_」 または c = 「.」 または c = 「/」
 
-複製定義文 と 送出定義文 と 書ける倉である と 読専である と 作業選択する と 確定する と 倉短名にする と 場所にする と 鍵前置作成する と 鍵書出する と 複製実行する と 複製する と 新規複製する と 最終行にする と 最終要素にする と 枝名抽出する と 送出実行する と 送出確認する と 既定枝確認する と 送出する と 送出実施する と 枝字である と 中表示する と 候補場にする と 候補倉にする と 倉候補である と URL倉名にする と 短名探索する と 有字である と 代行選択する と 場名取得する と 代行実施する と 枝語である と 代行注付加する は 非公開とする
+複製定義文 と 送出定義文 と 書ける倉である と 読専である と 作業選択する と 確定する と 倉短名にする と 場所にする と 鍵前置作成する と 鍵書出する と 複製実行する と 複製する と 移して複製する と 旧注付加する と 旧注結果にする と 要約文取得する と 画面JSONにする と 新規複製する と 最終行にする と 最終要素にする と 枝名抽出する と 送出実行する と 送出確認する と 既定枝確認する と 送出する と 送出実施する と 枝字である と 中表示する と 候補場にする と 候補倉にする と 倉候補である と URL倉名にする と 短名探索する と 有字である と 代行選択する と 場名取得する と 代行実施する と 枝語である と 代行注付加する は 非公開とする
