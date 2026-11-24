@@ -126,6 +126,23 @@ jobs:
           curl -s -X POST -d '{"role":"user","content":"メモは"}' $B/api/conversations/1/messages > /dev/null
           curl -s -X POST -d '{"conversation":1}' $B/api/chat > 出力/メモ答え
           grep -o '"content":"[^"]*"' 出力/メモ答え | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[指示: 短く\n\n## これまでのスレッドで分かったこと\n\n枝は ohanashi/x]'
+          # 決まり: はじめに見本が1つある。会話に付けると、見出しを付けて指示の前に届く。直すと次の答えから効く
+          curl -s $B/api/rules | grep -F '[{"id":1,"name":"コードを書くときの決まり","default":false,'
+          curl -s -X POST -d '{"name":"敬語","content":"です・ます で答える"}' $B/api/rules | grep -F '{"id":2,"name":"敬語","content":"です・ます で答える","default":false}'
+          curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{"name":" ","content":"x"}' $B/api/rules | grep -x 400
+          curl -s -X PUT -d '{"rules":[2]}' $B/api/conversations/1 | grep -F '"rules":[2]'
+          curl -s -X POST -d '{"role":"user","content":"決まりは"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat > 出力/決まり答え
+          grep -o '"content":"[^"]*"' 出力/決まり答え | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[指示: # 決まり: 敬語\nです・ます で答える\n\n# この会話の指示\n短く\n\n## これまでのスレッドで分かったこと\n\n枝は ohanashi/x]'
+          curl -s -X PUT -d '{"content":"丁寧に"}' $B/api/rules/2 | grep -F '"content":"丁寧に"'
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -o '"content":"[^"]*"' | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[指示: # 決まり: 敬語\n丁寧に\n\n'
+          curl -s $B/api/rules | grep -F '"name":"敬語","default":false,"length":3,'
+          # 既定の決まりは新しい会話に付く。決まりを消すと会話から外れる
+          curl -s -X PUT -d '{"default":true}' $B/api/rules/2 | grep -F '"default":true'
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"rules":[2]'
+          curl -s -X DELETE $B/api/rules/2 | grep -F '{"deleted":true}'
+          curl -s $B/api/conversations/1 | grep -F '"rules":[]'
+          curl -s -o /dev/null -w '%{http_code}\n' $B/api/rules/2 | grep -x 404
           curl -s -o /dev/null -w '%{http_code}\n' -X DELETE $B/api/threads/1 | grep -x 404
           curl -s -o /dev/null -w '%{http_code}\n' $B/api/threads/999 | grep -x 404
           curl -s -X POST -d '{"thread":999}' $B/api/chat | grep -F '{"error":"その会話かスレッドはありません"}'
@@ -235,6 +252,14 @@ jobs:
           [ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' ohanashi-8092-1)" = bridge ]
           [ -f 出力/作業/1/hello.py ]
           curl -s -X PUT -d '{"title":"題だけ"}' $B/api/conversations/1 | grep -F '"network":true'
+          # リポジトリの決まりのファイル: 答えの途中で砂場に作られたら、読み直してモデルに渡す。次の答えからは指示の頭に入る
+          curl -s -X POST -d '{"role":"user","content":"決まりを置いて"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat | tee 出力/決まり置き
+          grep -F '{"notice":"リポジトリの決まりを読みました: q/OHANASHI.md"}' 出力/決まり置き
+          grep -o '"content":"[^"]*"' 出力/決まり置き | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F 'おうむ返し: 作業フォルダのリポジトリに、次の決まりがあります。これに従ってください。\n\n# リポジトリ q の決まり(/work/q/OHANASHI.md)\nQ の決まり'
+          curl -s -X POST -d '{"role":"user","content":"次は"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat > 出力/決まり次
+          grep -o '"content":"[^"]*"' 出力/決まり次 | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F 'おうむ返し: 次は [指示: # リポジトリ q の決まり(/work/q/OHANASHI.md)\nQ の決まり]'
           # 会話を消すとコンテナも消える
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1

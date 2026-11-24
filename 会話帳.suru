@@ -2,6 +2,7 @@
 #   会話はモデル・指示・リポジトリなどの設定を持ち、その下にスレッドがいくつもある。発言はスレッドに付く
 #   道 を 帳準備する                     … 表がなければ作る
 #   道 を 処理 で 帳使用する              … 開いて 処理 に渡し、終わったら(失敗しても)閉じる
+# 決まり(モデルに守ってほしいことを書いた文書)もしまい、会話は使う決まりを番号で指す
 # 会話の一覧・中身は、画面へそのまま返せるように JSON にして返します。
 
 「標準」 を 読み込んで 使う
@@ -15,6 +16,8 @@
 会話 とは 番号 と 題 と モデル と 指示 と 温度 と 網 と 倉 と メモ の 組
 # 会話の中の話題ごとのスレッド
 スレッド とは 番号 と 会話番号 と 題 の 組
+# 決まり: 名前を付けてしまっておく、モデルに守ってほしいこと。既定 が 1 なら、新しい会話に最初から付ける
+決まり とは 番号 と 名前 と 内容 と 既定 の 組
 発言 とは 役 と 内容 の 組
 
 # --- 開く・閉じる ---
@@ -39,13 +42,15 @@ db を 表作成する とは 入出力手順
   # 前の版の 発言 にはスレッドの列がないので足し、スレッドのない会話にはスレッドを1つ作って、発言をそこに移す(2回目からは何もしない)
   （db に 「ALTER TABLE 発言 ADD COLUMN スレッド INTEGER REFERENCES スレッド(番号) ON DELETE CASCADE」 を SQLite実行する） を 試行する
   db に 移しの文 を SQLite実行する
-  0 を 結果にする
+  db を 見本準備する
 ただし 表の文 とは 「PRAGMA journal_mode = WAL;」
     + 「CREATE TABLE IF NOT EXISTS 会話 (番号 INTEGER PRIMARY KEY, 題 TEXT NOT NULL, モデル TEXT NOT NULL, 指示 TEXT NOT NULL DEFAULT '', 温度 REAL NOT NULL DEFAULT -1, 網 INTEGER NOT NULL DEFAULT 0, 倉 TEXT NOT NULL DEFAULT '', メモ TEXT NOT NULL DEFAULT '', 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
     + 「CREATE TABLE IF NOT EXISTS スレッド (番号 INTEGER PRIMARY KEY, 会話 INTEGER NOT NULL REFERENCES 会話(番号) ON DELETE CASCADE, 題 TEXT NOT NULL DEFAULT '', 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
     + 「CREATE INDEX IF NOT EXISTS スレッド_会話 ON スレッド (会話, 更新);」
     + 「CREATE TABLE IF NOT EXISTS 発言 (番号 INTEGER PRIMARY KEY, 会話 INTEGER NOT NULL REFERENCES 会話(番号) ON DELETE CASCADE, スレッド INTEGER REFERENCES スレッド(番号) ON DELETE CASCADE, 役 TEXT NOT NULL, 内容 TEXT NOT NULL, 作成 REAL NOT NULL);」
     + 「CREATE INDEX IF NOT EXISTS 発言_会話 ON 発言 (会話, 番号);」
+    + 「CREATE TABLE IF NOT EXISTS 決まり (番号 INTEGER PRIMARY KEY, 名前 TEXT NOT NULL, 内容 TEXT NOT NULL, 既定 INTEGER NOT NULL DEFAULT 0, 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
+    + 「CREATE TABLE IF NOT EXISTS 会話の決まり (会話 INTEGER NOT NULL REFERENCES 会話(番号) ON DELETE CASCADE, 決まり INTEGER NOT NULL REFERENCES 決まり(番号) ON DELETE CASCADE, 順 INTEGER NOT NULL, PRIMARY KEY (会話, 決まり));」
 ただし 移しの文 とは 「CREATE INDEX IF NOT EXISTS 発言_スレッド ON 発言 (スレッド, 番号);」
     + 「BEGIN;」
     + 「INSERT INTO スレッド (会話, 題, 作成, 更新) SELECT c.番号, c.題, c.作成, c.更新 FROM 会話 c WHERE NOT EXISTS (SELECT 1 FROM スレッド t WHERE t.会話 = c.番号);」
@@ -71,6 +76,7 @@ db に 題 を モデル で 会話作成する とは 入出力手順
   db に 「INSERT INTO 会話 (題, モデル, 作成, 更新) VALUES (?, ?, ?, ?)」 を （（題 の SQL文字列） と （モデル の SQL文字列） と （今 の SQL数） と （今 の SQL数）） で SQLite差込実行する
   n とは db を SQLite最終行番号取得した 結果
   db に n を 「」 で スレッド作成する
+  db に n を 既定決まり付与する
   n を 結果にする
 
 # 会話の一覧(新しく話した順): [{"id":1,"title":"…","model":"…","updated":…,"threads":スレッドの数}, …]
@@ -201,17 +207,119 @@ SQLite接続 から 数 を 最後答え削除する は 数 を 返す 入出�
 db から 番号 を 最後答え削除する とは
   db に 「DELETE FROM 発言 WHERE 番号 = (SELECT 番号 FROM 発言 WHERE スレッド = ? ORDER BY 番号 DESC LIMIT 1) AND 役 = 'assistant'」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
 
+# --- 決まり ---
+
+# はじめて決まりの表を作ったときだけ(user_version が 0)、見本の決まりを1つ入れる(既定の印は付けない)。
+# 使う人が見本を消したあとに、また入れないように、入れたら user_version を 1 にする
+SQLite接続 を 見本準備する は 数 を 返す 入出力動作
+db を 見本準備する とは 入出力手順
+  版 とは （db に 「PRAGMA user_version」 を SQLite問合した 結果） を 先頭数にする
+  もし 版 = 0 ならば db を 見本作成する そうでなければ 0 を 結果にする
+
+SQLite接続 を 見本作成する は 数 を 返す 入出力動作
+db を 見本作成する とは 入出力手順
+  db に 「PRAGMA user_version = 1」 を SQLite実行する
+  個数 とは （db に 「SELECT count(*) FROM 決まり」 を SQLite問合した 結果） を 先頭数にする
+  もし 個数 = 0 ならば db に 見本名 を 見本決まり へ 偽 で 決まり作成する そうでなければ 0 を 結果にする
+
+見本名 とは 「コードを書くときの決まり」
+見本決まり とは （「- まず、そのリポジトリやファイルの今の書き方(名前の付け方・字下げ・コメントの言葉)を見て、それに合わせる。」
+    と 「- 変えるのは頼まれた所だけにする。ついでの直しや、書式だけの整え直しはしない。」
+    と 「- 新しい依存(ライブラリ)は、要るときだけ、理由を言ってから足す。」
+    と 「- 書いたコードは、できるだけ動かして(試験があれば試験を通して)確かめてから答える。確かめられなかったら、そう言う。」
+    と 「- 分からないことや決めることがあれば、推し量らずに聞く。」
+    と 「- 答えには、何を変えたかと、なぜそうしたかを短く書く。」） を 改行 で 結合する
+
+# 決まりを作り、その番号を結果にする
+SQLite接続 に 文字列 を 文字列 へ 真偽 で 決まり作成する は 数 を 返す 入出力動作
+db に 名前 を 内容 へ 既定 で 決まり作成する とは 入出力手順
+  今 とは 時間内の現在時刻取得した 結果
+  db に 「INSERT INTO 決まり (名前, 内容, 既定, 作成, 更新) VALUES (?, ?, ?, ?, ?)」 を （（名前 の SQL文字列） と （内容 の SQL文字列） と （（既定 を 印数にする） の SQL数） と （今 の SQL数） と （今 の SQL数）） で SQLite差込実行する
+  n とは db を SQLite最終行番号取得した 結果
+  n を 結果にする
+
+真偽 を 印数にする は 数 を 返す
+b を 印数にする とは もし b ならば 1 そうでなければ 0
+
+# 決まりの一覧(名前の順): [{"id":…,"name":…,"default":真偽,"length":文字数,"updated":…,"uses":付けている会話の数}, …]
+SQLite接続 を 決まり一覧取得する は JSON を 返す 入出力動作
+db を 決まり一覧取得する とは 入出力手順
+  行群 とは db に 「SELECT 番号, 名前, 既定, length(内容), 更新, (SELECT count(*) FROM 会話の決まり k WHERE k.決まり = 決まり.番号) FROM 決まり ORDER BY 名前, 番号」 を SQLite問合した 結果
+  （行群 の それぞれ を 決まり項目にする） の JSON配列 を 結果にする
+
+SQL値 の リスト を 決まり項目にする は JSON を 返す
+行 を 決まり項目にする とは
+  （（「id」 と （（行 から 1 を 番目取得して 値数にする） の JSON数） の JSON項目） と （「name」 と （（行 から 2 を 番目取得して 値文字列にする） の JSON文字列） の JSON項目） と （「default」 と （（（行 から 3 を 番目取得して 値数にする） = 1） の JSON真偽） の JSON項目） と （「length」 と （（行 から 4 を 番目取得して 値数にする） の JSON数） の JSON項目） と （「updated」 と （（行 から 5 を 番目取得して 値数にする） の JSON数） の JSON項目） と （「uses」 と （（行 から 6 を 番目取得して 値数にする） の JSON数） の JSON項目）） の JSON物
+
+# 番号の決まり(なければ 無)
+SQLite接続 から 数 を 決まり取得する は 決まり の 有無 を 返す 入出力動作
+db から 番号 を 決まり取得する とは 入出力手順
+  行群 とは db に 「SELECT 番号, 名前, 内容, 既定 FROM 決まり WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
+  行群 を 決まり有無にして 結果にする
+
+SQL値 の リスト の リスト を 決まり有無にする は 決まり の 有無 を 返す
+空 を 決まり有無にする とは 無
+（先頭 は 行 で 残り は 他） を 決まり有無にする とは （行 を 決まり行にする） の 有
+
+SQL値 の リスト を 決まり行にする は 決まり を 返す
+行 を 決まり行にする とは 番号 は （行 から 1 を 番目取得して 値数にする） で 名前 は （行 から 2 を 番目取得して 値文字列にする） で 内容 は （行 から 3 を 番目取得して 値文字列にする） で 既定 は （行 から 4 を 番目取得して 値数にする） の 決まり
+
+# 名前・内容・既定を書きかえる
+SQLite接続 に 決まり を 決まり更新する は 数 を 返す 入出力動作
+db に k を 決まり更新する とは 入出力手順
+  今 とは 時間内の現在時刻取得した 結果
+  db に 「UPDATE 決まり SET 名前 = ?, 内容 = ?, 既定 = ?, 更新 = ? WHERE 番号 = ?」 を （（k の 名前 の SQL文字列） と （k の 内容 の SQL文字列） と （k の 既定 の SQL数） と （今 の SQL数） と （k の 番号 の SQL数）） で SQLite差込実行する
+
+# 決まりを消す(付けていた会話からも外れる)。消した数を結果にする
+SQLite接続 から 数 を 決まり削除する は 数 を 返す 入出力動作
+db から 番号 を 決まり削除する とは
+  db に 「DELETE FROM 決まり WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
+
+# 会話に付けた決まり(付けた順)
+SQLite接続 から 数 を 会話決まり取得する は 決まり の リスト を 返す 入出力動作
+db から 会話番号 を 会話決まり取得する とは 入出力手順
+  行群 とは db に 「SELECT r.番号, r.名前, r.内容, r.既定 FROM 会話の決まり k JOIN 決まり r ON r.番号 = k.決まり WHERE k.会話 = ? ORDER BY k.順, r.番号」 を （（会話番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
+  行群 の それぞれ を 決まり行にして 結果にする
+
+決まり を 決まり番号取得する は 数 を 返す
+k を 決まり番号取得する とは k の 番号
+
+# 会話に付ける決まりを、番号群 の順に付け直す(ない番号は飛ばす)
+SQLite接続 に 数 を 数 の リスト で 会話決まり設定する は 数 を 返す 入出力動作
+db に 会話番号 を 番号群 で 会話決まり設定する とは 入出力手順
+  db に 「DELETE FROM 会話の決まり WHERE 会話 = ?」 を （（会話番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
+  db に 会話番号 を 番号群 から 1 で 決まり順挿入する
+
+SQLite接続 に 数 を 数 の リスト から 数 で 決まり順挿入する は 数 を 返す 入出力動作
+db に 会話番号 を 空 から 順 で 決まり順挿入する とは 0 を 結果にする
+db に 会話番号 を （先頭 は n で 残り は 他） から 順 で 決まり順挿入する とは 入出力手順
+  db に 「INSERT OR IGNORE INTO 会話の決まり (会話, 決まり, 順) SELECT ?, 番号, ? FROM 決まり WHERE 番号 = ?」 を （（会話番号 の SQL数） と （順 の SQL数） と （n の SQL数）） で SQLite差込実行する
+  db に 会話番号 を 他 から （順 + 1） で 決まり順挿入する
+
+# 既定の印の決まりを、会話に付ける(新しい会話を作ったとき)
+SQLite接続 に 数 を 既定決まり付与する は 数 を 返す 入出力動作
+db に 会話番号 を 既定決まり付与する とは
+  db に 「INSERT OR IGNORE INTO 会話の決まり (会話, 決まり, 順) SELECT ?, 番号, 番号 FROM 決まり WHERE 既定 = 1」 を （（会話番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
+
+# 決まりの中身: {"id":…,"name":…,"content":…,"default":真偽}
+決まり を 決まりJSONにする は JSON を 返す
+k を 決まりJSONにする とは
+  （（「id」 と （k の 番号 の JSON数） の JSON項目） と （「name」 と （k の 名前 の JSON文字列） の JSON項目） と （「content」 と （k の 内容 の JSON文字列） の JSON項目） と （「default」 と （（k の 既定 = 1） の JSON真偽） の JSON項目）） の JSON物
+
 # --- JSON にする ---
 
 発言 を 発言JSONにする は JSON を 返す
 m を 発言JSONにする とは
   （（「role」 と （m の 役 の JSON文字列） の JSON項目） と （「content」 と （m の 内容 の JSON文字列） の JSON項目）） の JSON物
 
-# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"network":真偽,"repos":[{"repo":…,"write":真偽}, …],"memo":…,"threads":[…]}
-# threads は スレッド一覧取得した JSON。発言はスレッドの中身で読む
-会話 を JSON で 会話JSONにする は JSON を 返す
-c を 筋群 で 会話JSONにする とは
-  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「network」 と （（c の 網 = 1） の JSON真偽） の JSON項目） と （「repos」 と （c の 倉 を 倉JSONにする） の JSON項目） と （「memo」 と （c の メモ の JSON文字列） の JSON項目） と （「threads」 と 筋群 の JSON項目）） の JSON物
+# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"network":真偽,"repos":[{"repo":…,"write":真偽}, …],"memo":…,"rules":[決まりの番号, …],"threads":[…]}
+# threads は スレッド一覧取得した JSON。発言はスレッドの中身で読む。決番群 は付けた決まりの番号(付けた順)
+会話 を JSON で 数 の リスト から 会話JSONにする は JSON を 返す
+c を 筋群 で 決番群 から 会話JSONにする とは
+  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「network」 と （（c の 網 = 1） の JSON真偽） の JSON項目） と （「repos」 と （c の 倉 を 倉JSONにする） の JSON項目） と （「memo」 と （c の メモ の JSON文字列） の JSON項目） と （「rules」 と （（決番群 の それぞれ を JSON数にする） の JSON配列） の JSON項目） と （「threads」 と 筋群 の JSON項目）） の JSON物
+
+数 を JSON数にする は JSON を 返す
+n を JSON数にする とは n の JSON数
 
 # スレッドの中身: {"id":…,"conversation":…,"title":…,"messages":[…]}
 スレッド を 発言 の リスト で スレッドJSONにする は JSON を 返す
@@ -228,4 +336,4 @@ JSON を 配列確認する は JSON を 返す
 （xs という JSON配列） を 配列確認する とは xs の JSON配列
 v を 配列確認する とは 空 の JSON配列
 
-倉JSONにする と 配列確認する と 値文字列にする と 値数にする と 型逃避する と 検索項目にする と 一覧項目にする と 会話行にする と 発言行にする と スレッド行にする と スレッド項目にする と 先頭数にする は 非公開とする
+倉JSONにする と 配列確認する と 値文字列にする と 値数にする と 型逃避する と 検索項目にする と 一覧項目にする と 会話行にする と 発言行にする と スレッド行にする と スレッド項目にする と 先頭数にする と 見本作成する と 印数にする と 決まり項目にする と 決まり行にする と 決まり有無にする と 決まり順挿入する と JSON数にする は 非公開とする

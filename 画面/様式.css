@@ -145,6 +145,17 @@ select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-
 #倉一覧 .倉名 { font-family: ui-monospace, monospace; }
 #設定欄 .倉追加 { gap: 6px; align-items: center; }
 #倉名 { flex: 1; min-width: 10em; }
+#設定欄 { max-height: 75vh; overflow-y: auto; }
+#決まり欄 { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+#決まり一覧 { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+#決まり一覧 label { flex-direction: row; align-items: center; gap: 6px; }
+#設定欄 .決まり行 { gap: 8px; align-items: center; }
+#決まり編集 { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); }
+#決まり編集[hidden] { display: none; }
+#決まり名 { flex: 1; min-width: 10em; padding: 5px 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--面); }
+#決まり選択 { max-width: 100%; }
+#決まり内容 { width: 100%; min-height: 10em; font-family: ui-monospace, monospace; font-size: 0.85rem; resize: vertical; }
+#決まり数 { margin-left: 2px; }
 #知らせ { padding: 8px 16px; font-size: 0.9rem; }
 #知らせ.誤り { background: color-mix(in srgb, var(--誤) 12%, var(--面)); color: var(--誤); }
 

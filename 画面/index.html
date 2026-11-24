@@ -27,10 +27,35 @@
     <h1 id="題" title="クリックでスレッドの題を変えます">新しい会話</h1>
     <button id="新スレッド" type="button" class="小" title="この会話に新しいスレッドを作ります。リポジトリなどの設定はそのまま使えます" hidden>＋<span class="字"> スレッド</span></button>
     <select id="モデル" aria-label="モデル"></select>
-    <button id="設定開く" type="button" class="小" aria-label="設定" aria-expanded="false">⚙</button>
+    <button id="設定開く" type="button" class="小" aria-label="設定" aria-expanded="false">⚙<span id="決まり数" class="小字" hidden></span></button>
   </header>
   <section id="設定欄" hidden>
-    <label>指示(システムプロンプト)
+    <div id="決まり欄">
+      <span class="欄名">📜 決まり(印を付けた決まりを、モデルが答えるたびに読みます)</span>
+      <ul id="決まり一覧"></ul>
+      <div class="行 決まり行">
+        <span id="決まり字数" class="淡 小字"></span>
+        <button id="決まり直す" type="button" class="小" aria-expanded="false">決まりを作る・直す</button>
+      </div>
+      <div id="決まり編集" hidden>
+        <div class="行 決まり行">
+          <select id="決まり選択" aria-label="直す決まり"></select>
+          <input id="決まり名" placeholder="名前(例: コードを書くときの決まり)" aria-label="決まりの名前" autocomplete="off">
+        </div>
+        <textarea id="決まり内容" rows="8" placeholder="例:&#10;- 今のコードの書き方に合わせる&#10;- 変えるのは頼まれた所だけにする&#10;- 動かして確かめてから答える" aria-label="決まりの中身"></textarea>
+        <div class="行 決まり行">
+          <label class="並び"><input id="決まり既定" type="checkbox"> 新しい会話に最初から付ける</label>
+          <span id="決まり内容字数" class="淡 小字"></span>
+        </div>
+        <div class="行 決まり行">
+          <button id="決まり保存" type="button" class="小 主">保存</button>
+          <button id="決まり消す" type="button" class="小">消す</button>
+          <button id="決まり閉じる" type="button" class="小">閉じる</button>
+          <span id="決まり案内" class="淡 小字">Markdown で書けます。モデルにはそのまま渡します。直すと、付けているすべての会話の次の答えから効きます。</span>
+        </div>
+      </div>
+    </div>
+    <label>指示(この会話だけの指示。システムプロンプト)
       <textarea id="指示" rows="3" placeholder="例: 日本語で、短く答えてください。"></textarea>
     </label>
     <label>📒 メモ(どのスレッドでも、モデルが「これまでのスレッドで分かったこと」として読みます。答えの「メモに足す」でも足せます)
