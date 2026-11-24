@@ -59,7 +59,16 @@ mkdir -p searxng
 docker run -d --name searxng -p 8888:8080 -v "$PWD/searxng:/etc/searxng" searxng/searxng
 ```
 
-最初に起動すると `searxng/settings.yml` ができます。これを開いて、`search:` の `formats:` に `- json` を足し(足さないと JSON の要求は 403 で断られます)、`server:` の `limiter:` を `false` にしてから、`docker restart searxng` します。そのあと SearXNG の URL を渡して起動します。
+最初に起動すると `searxng/settings.yml` ができます。JSON で答えるのを許すように、ファイルの終わりに次を足して(足さないと JSON の要求は 403 で断られます)、`docker restart searxng` します。`server:` に `limiter: true` があれば `false` にします。
+
+```yaml
+search:
+  formats:
+    - html
+    - json
+```
+
+`curl 'http://localhost:8888/search?q=test&format=json'` で JSON が返れば準備はできています。そのあと SearXNG の URL を渡して起動します。
 
 ```sh
 SEARXNG_URL=http://localhost:8888 kumu 実行
