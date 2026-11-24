@@ -194,6 +194,60 @@ jobs:
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1
           kill %1 %2
+      - name: 砂場に GitHub のリポジトリを clone して、変えたものを push し、PR を作る(Linux)
+        # clone と push は手元の裸のリポジトリ(file://)、PR は偽の GitHub が相手
+        if: runner.os == 'Linux'
+        run: |
+          rm -rf 出力/裸 出力/種 出力/作業G 出力/GitHub作業.db
+          git init -q --bare --initial-branch=main 出力/裸/o/r.git
+          git clone -q 出力/裸/o/r.git 出力/種
+          printf '# 試し\n' > 出力/種/README.md
+          git -C 出力/種 add README.md
+          git -C 出力/種 -c user.name=t -c user.email=t@example.com commit -q -m 初め
+          git -C 出力/種 push -q origin HEAD:main
+          ./出力/偽Ollama 11440 > 出力/偽Ollama8.log 2>&1 &
+          F=$!
+          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11440 --db 出力/GitHub作業.db --port 8100 --work 出力/作業G --sandbox-image python:3.12-slim --github-api http://127.0.0.1:11440 --github-git "file://$PWD/出力/裸" --github-repos o/r > 出力/アプリ8.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8100/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8100
+          話す() { curl -s -X POST -d "{\"role\":\"user\",\"content\":\"$1\"}" $B/api/conversations/1/messages > /dev/null; curl -s -X POST -d '{"conversation":1,"code":true,"github":true}' $B/api/chat; }
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations > /dev/null
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":true}]}' $B/api/conversations/1 > /dev/null
+          # clone はサーバーが行い、コンテナの /work から見える。鍵は .git/config にも鍵場にも残らない
+          話す 'o/r を clone して' | tee 出力/git答え1
+          grep -F '{"running":"🐙 o/r を clone しています"}' 出力/git答え1
+          grep -F '"summary":"🐙 o/r を /work/r に clone しました(枝 main)"' 出力/git答え1
+          [ "$(git -C 出力/作業G/1/r config user.name)" = 試し ]
+          [ "$(git -C 出力/作業G/1/r config user.email)" = 試し@users.noreply.github.com ]
+          if grep -rF 試し鍵 出力/作業G; then exit 1; fi
+          [ -z "$(ls -A 出力/作業G/.鍵)" ]
+          docker exec ohanashi-8100-1 cat /work/r/README.md | grep -x '# 試し'
+          printf 'こんにちは\n' >> 出力/作業G/1/r/README.md
+          # 既定の枝には push しない
+          話す 'main に push して' | grep -F '"summary":"🐙 書けませんでした: 既定の枝(main)には push しません。'
+          # 新しい枝に commit して push する。commit の文の終わりに、書いたモデルを付ける
+          話す 'push して' | tee 出力/git答え2
+          grep -F '{"running":"🐙 o/r の枝 ohanashi/test に push しています"}' 出力/git答え2
+          grep -F '"summary":"🐙 o/r の枝 ohanashi/test に push しました(' 出力/git答え2
+          [ "$(git --git-dir 出力/裸/o/r.git log -1 --format='%an <%ae>|%s' ohanashi/test)" = '試し <試し@users.noreply.github.com>|README を直す' ]
+          git --git-dir 出力/裸/o/r.git log -1 --format=%B ohanashi/test | grep -xF '— ohanashi-ollama(偽) で書きました'
+          [ "$(git --git-dir 出力/裸/o/r.git show ohanashi/test:README.md | tail -n 1)" = こんにちは ]
+          [ "$(git --git-dir 出力/裸/o/r.git rev-parse main)" = "$(git -C 出力/種 rev-parse HEAD)" ]
+          [ -z "$(ls -A 出力/作業G/.鍵)" ]
+          話す 'push して' | grep -F '"summary":"🐙 書けませんでした: push する変更がありません。'
+          # PR を作る(偽の GitHub は、届いた本文を title に入れて返す)
+          話す 'PR を作って' | tee 出力/git答え3
+          grep -F '"summary":"🐙 o/r に PR [#12](https://github.com/o/r/pull/12) を作りました: README を直す(ohanashi/test → main)"' 出力/git答え3
+          grep -o '"content":"[^"]*"' 出力/git答え3 | sed 's/"content":"//; s/"$//' | tr -d '\n' > 出力/git答え3.文
+          grep -F 'head\:\ohanashi/test\' 出力/git答え3.文
+          grep -F 'base\:\main\' 出力/git答え3.文
+          grep -F '直しました\\n\\n— ohanashi-ollama(偽) で書きました' 出力/git答え3.文
+          # 読むだけにすると、push の道具を渡さない
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":false}]}' $B/api/conversations/1 > /dev/null
+          話す 'push して' | grep -c 'push しています' | grep -x 0
+          kill $A $F
+          docker rm -f ohanashi-8100-1 > /dev/null
       - name: 起動.sh で、画面から頼んで動かし直す
         run: |
           ./出力/偽Ollama 11438 > 出力/偽Ollama4.log 2>&1 &

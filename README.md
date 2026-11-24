@@ -13,7 +13,7 @@
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
 - 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
-- 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます。読み書きのリポジトリには、頼めば issue を作る・直す・コメントする・閉じることもできます
+- 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます。読み書きのリポジトリには、頼めば issue を作る・直す・コメントする・閉じることや、「💻 砂場」で clone して直したものを push して PR を作ることもできます
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -57,6 +57,8 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--github-repos 一覧` | 会話に足してよい GitHub のリポジトリ(`owner/名前` か `owner/*` を「,」で区切る) | なし(GitHub を使わない) |
 | `--github-token 鍵` | GitHub の鍵(個人アクセストークン) | 環境変数 `GITHUB_TOKEN`、なければ鍵なし(公開のリポジトリだけ、1時間に60回まで) |
 | `--github-api URL` | GitHub の API の基点(GitHub Enterprise なら `https://主機/api/v3`) | `https://api.github.com` |
+| `--github-git URL` | clone・push する URL の頭(`URL/owner/名前.git` を使う) | API の基点から決める(`https://github.com` など) |
+| `--git-author "名前 <メール>"` | 砂場の clone で commit するときの名前 | 鍵の持ち主の名前と `名前@users.noreply.github.com` |
 
 ### 起動.sh で動かす(画面から再起動・新しいコミットで更新)
 
@@ -155,6 +157,25 @@ GITHUB_TOKEN=github_pat_… kumu 実行 -- --github-repos suru-lang/suru,suru-la
 
 書くリポジトリの鍵には、Issues と Pull requests の読み書きの権限が要ります。
 
+### GitHub のリポジトリを直して PR を作る
+
+「🐙 GitHub」と「💻 砂場」を両方押して送ると、さらに2つの道具を渡します。
+
+- `github_clone`: リポジトリを砂場の `/work/名前` に clone する(最新のコミットだけ)。手元では `作業/会話の番号/名前` です
+- `github_push`: `/work/名前` で変えたものを全部 commit して、枝に push する(読み書きのリポジトリだけ)
+
+モデルは clone したファイルを `run` と `write_file` で直して確かめ、`github_push` で `ohanashi/fix-typo` のような新しい枝に push し、`github_pr` で PR を作ります。git はサーバー(手元)で動かすので、コンテナに git や鍵がなくても、コンテナがネットワークにつながっていなくてもできます。commit の名前は鍵の持ち主の名前と `名前@users.noreply.github.com` で、`--git-author "名前 <メール>"` で変えられます。commit の文の終わりにも「— ohanashi-ollama(モデル名) で書きました」を付けます。
+
+#### 鍵の作り方
+
+1. GitHub の [Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) で「Generate new token」を押す
+2. 「Repository access」で、会話で使うリポジトリだけを選ぶ
+3. 「Permissions」の「Repository permissions」で、次を選ぶ
+   - 読むだけ: Metadata(Read-only、いつも付きます)・Contents・Issues・Pull requests を Read-only
+   - issue を書く: Issues を Read and write
+   - push して PR を作る: Contents と Pull requests を Read and write
+4. できた鍵(`github_pat_…`)を `GITHUB_TOKEN` に入れて起動する
+
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
 ## 試験
@@ -173,7 +194,7 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435   # SearXNG で試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、「issue を作って」なら `o/r` に issue を作り、「issue を閉じて」なら `o/r` の #1 を閉じます。偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、「issue を作って」なら `o/r` に issue を作り、「issue を閉じて」なら `o/r` の #1 を閉じ、「clone して」「push して」「main に push して」「PR を作って」でそれぞれの道具を呼びます。偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -184,7 +205,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
-| [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む、issue を書く)と、会話のリポジトリの許し |
+| [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む、issue と PR を書く)と、会話のリポジトリの許し |
+| [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
@@ -265,6 +287,10 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 8. **書く道具は1つ。** issue の作る・直す・コメント・閉じる・開くを、`action` で選ぶ1つの道具にしました。道具が多いと、小さいモデルが迷うためです。
 9. **issue は消さない。** 消す道具は作らず、閉じる(`not_planned`)で足ります。GitHub でも、issue を消せるのはリポジトリの管理者だけです。
 10. **書いたことがわかるようにする。** 書いた本文とコメントの終わりに「— ohanashi-ollama(モデル名) で書きました」を付けます(もう付いていれば付けません)。GitHub では鍵の持ち主が書いたことになるので、読む人がモデルの書いたものと見分けられるようにしました。
+11. **git はサーバーで動かす。** clone・commit・push は、コンテナではなく手元の git で行います。鍵をコンテナに入れずに済み、git のないイメージやネットワークのないコンテナでも使えます。モデルはコンテナの中で、ファイルを直して確かめることだけをします。
+12. **鍵は git のその時だけ渡す。** 鍵は、コンテナからは見えない `作業/.鍵`(700)に置いたファイルに書き、git を動かす sh がそれを読んですぐ消してから、`GIT_CONFIG_COUNT` などの環境変数で `http.extraHeader`(`Authorization: Basic …`)にします。コマンドの文字列(`ps` に出る)・`.git/config`・remote の URL には入れません。
+13. **push は新しい枝だけ。** `github_push` は、リポジトリの既定の枝への push を断り、`--force` もしません(先へ進めない push は GitHub が断ります)。枝の名前は英数字と `- _ . /` だけにし、コマンドに渡すときは `'…'` で囲みます。保護された枝は GitHub が断ります。
+14. **commit は変えたもの全部。** `github_push` は `git add -A` で全部を commit します。変えたものも、まだ push していない commit もなければ、push せずにそう返します。リポジトリの hook は動かしません(`core.hooksPath=/dev/null`)。
 
 ## 今後の候補
 

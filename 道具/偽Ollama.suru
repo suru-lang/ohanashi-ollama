@@ -11,9 +11,11 @@
 #                       run で動かす道具の呼び出しを返す。道具の結果(role が tool)には、その結果をおうむ返しする
 #                       道具に github_file があり、最後の問いが「GitHub」を含むなら、o/r の README.md を読む道具の呼び出しを返す
 #                       道具に github_issue があり、最後の問いが「issue を作って」を含むなら o/r に issue を作る、
-#                       「issue を閉じて」を含むなら o/r の #1 を閉じる道具の呼び出しを返す
+#                       「issue を閉じて」を含むなら o/r の #1 を閉じる道具の呼び出しを返す。
+#                       同じように「clone して」で github_clone、「push して」で ohanashi/test へ、「main に push して」で main へ github_push、
+#                       「PR を作って」で ohanashi/test から github_pr
 #   GET  /user・/repos/o/r/… … GitHub の API の代わり(--github-api でここを指す)。/user は Authorization が「Bearer 試し鍵」でなければ 401
-#   POST /repos/o/r/issues・PATCH /repos/o/r/issues/1 … issue #7 を作った・#1 を直した答え。title に、届いた本文の JSON をそのまま入れる
+#   POST /repos/o/r/issues・PATCH /repos/o/r/issues/1・POST /repos/o/r/pulls … issue #7 を作った・#1 を直した・PR #12 を作った答え。title に、届いた本文の JSON をそのまま入れる
 #   POST /api/web_search … 見出し Authorization が「Bearer 試し鍵」なら、問いを題に入れた2つの結果を返す。違えば 401
 #   GET  /search?q=…&format=json … SearXNG の代わり。符号化したままの q を題に入れた6つの結果を返す。format=json がなければ 403
 
@@ -86,13 +88,19 @@ j が GitHub番である とは 役 = 「user」 かつ 内容 が 「GitHub」 
 # 書く道具を呼ぶ番か: tools に github_issue があり、最後の問いが「issue を作って」か「issue を閉じて」を含む
 JSON を 書番にする は 文字列 を 返す
 j を 書番にする とは
-  もし 役 ≠ 「user」 または （j から 「tools」 を JSON取得して JSON文字列にする） が 「github_issue」 を 含有でない ならば 「」
+  もし 役 ≠ 「user」 ならば 「」
+  そうでなければ もし 道具文 が 「"name":"github_clone"」 を 含有である かつ 内容 が 「clone して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_clone","arguments":{"repo":"o/r"}}}]},"done":false}」
+  そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「main に push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"main","message":"直す"}}}]},"done":false}」
+  そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"ohanashi/test","message":"README を直す"}}}]},"done":false}」
+  そうでなければ もし 道具文 が 「"name":"github_pr"」 を 含有である かつ 内容 が 「PR を作って」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_pr","arguments":{"repo":"o/r","branch":"ohanashi/test","title":"README を直す","body":"直しました"}}}]},"done":false}」
+  そうでなければ もし 道具文 が 「"name":"github_issue"」 を 含有でない ならば 「」
   そうでなければ もし 内容 が 「issue を作って」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_issue","arguments":{"repo":"o/r","action":"create","title":"試しの issue","body":"動きません","labels":["bug"]}}}]},"done":false}」
   そうでなければ もし 内容 が 「issue を閉じて」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_issue","arguments":{"repo":"o/r","action":"close","number":1,"reason":"not_planned"}}}]},"done":false}」
   そうでなければ 「」
 ただし 群 とは j から 「messages」 を JSON取得して 要素群にする
 ただし 役 とは もし 群 が 空 ならば 「」 そうでなければ 群 の 最後 を 「role」 で 項目文字にする
 ただし 内容 とは もし 群 が 空 ならば 「」 そうでなければ 群 の 最後 を 「content」 で 項目文字にする
+ただし 道具文 とは j から 「tools」 を JSON取得して JSON文字列にする
 
 GitHub呼出行 とは 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_file","arguments":{"repo":"o/r","path":"README.md"}}}]},"done":false}」
 
@@ -147,6 +155,7 @@ i を 問 で 結果項目にする とは （（「title」 と （（問 + 「
 HTTP内の要求 を GitHub応答にする は HTTP内の応答 を 返す
 問い を GitHub応答にする とは
   もし 問い の 方法 = 「POST」 かつ 道 = 「/repos/o/r/issues」 ならば 201 で （「{"number":7,"html_url":"https://github.com/o/r/issues/7","state":"open","title":」 + （（問い の 本文） の JSON文字列 を JSON文字列にする） + 「}」） を HTTP内の状態応答する
+  そうでなければ もし 問い の 方法 = 「POST」 かつ 道 = 「/repos/o/r/pulls」 ならば 201 で （「{"number":12,"html_url":"https://github.com/o/r/pull/12","state":"open","title":」 + （（問い の 本文） の JSON文字列 を JSON文字列にする） + 「}」） を HTTP内の状態応答する
   そうでなければ もし 問い の 方法 = 「PATCH」 かつ 道 = 「/repos/o/r/issues/1」 ならば （「{"number":1,"html_url":"https://github.com/o/r/issues/1","state":"closed","title":」 + （（問い の 本文） の JSON文字列 を JSON文字列にする） + 「}」） を HTTP内の本文応答する
   そうでなければ もし 道 = 「/user」 ならば （もし （問い から 「authorization」 を HTTP内の見出し値にする） = 「Bearer 試し鍵」 ならば 「{"login":"試し"}」 を HTTP内の本文応答する そうでなければ 401 で 「{"message":"Bad credentials"}」 を HTTP内の状態応答する）
   そうでなければ もし 道 = 「/repos/o/r」 ならば 「{"full_name":"o/r","description":"試しのリポジトリ","default_branch":"main","visibility":"public","topics":["suru"],"has_issues":true,"open_issues_count":1}」 を HTTP内の本文応答する
