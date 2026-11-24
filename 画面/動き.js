@@ -515,6 +515,14 @@ function 発言を足す(役, 内容) {
   写.textContent = "写す";
   写.addEventListener("click", () => 写し取る(写, el.dataset.内容 || ""));
   道具.append(写);
+  if (役 === "assistant") {
+    const 留 = document.createElement("button");
+    留.type = "button";
+    留.textContent = "メモに足す";
+    留.title = "この答えを会話のメモに足します。メモは、この会話のどのスレッドでもモデルが読みます";
+    留.addEventListener("click", () => メモに足す(el));
+    道具.append(留);
+  }
   el.append(道具);
   会話欄.append(el);
   下へ();
@@ -582,15 +590,41 @@ function 設定欄表示() {
   $("温度").value = 温度 < 0 ? 0.8 : 温度;
   $("温度値").textContent = $("温度").value;
   $("砂場網").checked = 今 ? 今.network : false;
+  $("メモ").value = 今 ? (今.memo || "") : "";
+  メモ字数表示();
   倉一覧表示();
 }
 
+const メモ上限 = 8000;
+function メモ字数表示() {
+  const n = $("メモ").value.length;
+  $("メモ字数").textContent = `${n} / ${メモ上限} 文字` + (n > メモ上限 ? "(多すぎるので、短くするまで保存しません)" : "");
+  $("メモ字数").classList.toggle("誤り字", n > メモ上限);
+}
+
 function 設定の値() {
-  return { system: $("指示").value, temperature: $("温度既定").checked ? -1 : Number($("温度").value), network: $("砂場網").checked };
+  return { system: $("指示").value, temperature: $("温度既定").checked ? -1 : Number($("温度").value), network: $("砂場網").checked, memo: $("メモ").value };
 }
 
 async function 設定保存() {
-  if (今) 今 = await API(`conversations/${今.id}`, "PUT", 設定の値());
+  if (!今 || $("メモ").value.length > メモ上限) return;
+  try { 今 = await API(`conversations/${今.id}`, "PUT", 設定の値()); }
+  catch (e) { 知らせる(`設定を保存できませんでした(${e.message})`); }
+}
+
+// 答え(途中経過を除く)を会話のメモの終わりに足して保存し、⚙ を開いて見せる
+async function メモに足す(el) {
+  if (!今) return;
+  const 文 = 途中を分ける(el.dataset.内容 || "").答え.trim();
+  if (!文) return;
+  const 前 = $("メモ").value.trim();
+  $("メモ").value = (前 ? 前 + "\n\n" : "") + 文;
+  メモ字数表示();
+  $("設定欄").hidden = false;
+  $("設定開く").setAttribute("aria-expanded", "true");
+  $("メモ").scrollTop = $("メモ").scrollHeight;
+  await 設定保存();
+  if ($("メモ").value.length > メモ上限) { $("メモ").focus(); 知らせる(`メモが ${メモ上限} 文字を超えました。⚙ のメモを短くしてください`); }
 }
 
 $("設定開く").addEventListener("click", () => {
@@ -604,6 +638,8 @@ $("温度").addEventListener("input", () => { $("温度値").textContent = $("�
 $("温度").addEventListener("change", 設定保存);
 // 砂場のネットワークを変えると、次に砂場を使うときにコンテナを作り直す(/work のファイルは残る)
 $("砂場網").addEventListener("change", 設定保存);
+$("メモ").addEventListener("input", メモ字数表示);
+$("メモ").addEventListener("change", 設定保存);
 
 // --- 題を変える ---
 // 押すと書けるようになり、Enter かほかを押すと保存する。見出しの大きい題はスレッドの、小さい題は会話の題
@@ -786,7 +822,7 @@ async function 送る() {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
       今 = await API("conversations", "POST", { model: モデル欄.value });
-      if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
+      if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || $("メモ").value || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
       新規倉 = [];
       筋 = await API(`threads/${今.threads[0].id}`);
       history.replaceState(null, "", 道を作る(今.id, 筋.id));

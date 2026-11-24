@@ -86,6 +86,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 .項目 .消す { visibility: hidden; border: none; background: none; padding: 4px 8px; font-size: 0.85rem; }
 .項目:hover .消す, .項目 .消す.確認, .項目.今 .消す { visibility: visible; }
 .消す.確認 { color: var(--誤); font-weight: 700; }
+.誤り字 { color: var(--誤); }
 /* 開いている会話の下に並べるスレッド */
 .スレッド項目 { margin-left: 14px; border-left: 2px solid var(--線); border-radius: 0 8px 8px 0; }
 .スレッド項目 a { padding: 4px 8px; font-size: 0.9rem; }

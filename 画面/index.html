@@ -33,6 +33,10 @@
     <label>指示(システムプロンプト)
       <textarea id="指示" rows="3" placeholder="例: 日本語で、短く答えてください。"></textarea>
     </label>
+    <label>📒 メモ(どのスレッドでも、モデルが「これまでのスレッドで分かったこと」として読みます。答えの「メモに足す」でも足せます)
+      <textarea id="メモ" rows="3" placeholder="例: 作業の枝は ohanashi/fix-login。試験は kumu 試験 で動かす。"></textarea>
+      <span id="メモ字数" class="淡 小字"></span>
+    </label>
     <div class="行">
       <label class="並び"><input id="温度既定" type="checkbox" checked> 温度はモデルの既定</label>
       <label class="並び">温度 <input id="温度" type="range" min="0" max="2" step="0.1" value="0.8" disabled> <output id="温度値">0.8</output></label>

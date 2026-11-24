@@ -116,6 +116,12 @@ jobs:
           curl -s -X POST -d '{"q":"発言の数"}' $B/api/search | grep -F "\"thread\":$T,"
           curl -s $B/api/conversations | grep -F '"threads":2'
           curl -s -X DELETE $B/api/threads/$T | grep -F '{"deleted":true}'
+          # 会話のメモは、どのスレッドでも指示のあとに届く
+          curl -s -X PUT -d '{"memo":"枝は ohanashi/x"}' $B/api/conversations/1 | grep -F '"memo":"枝は ohanashi/x"'
+          curl -s -o /dev/null -w '%{http_code}\n' -X PUT -d "{\"memo\":\"$(printf 'あ%.0s' $(seq 8001))\"}" $B/api/conversations/1 | grep -x 400
+          curl -s -X POST -d '{"role":"user","content":"メモは"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat > 出力/メモ答え
+          grep -o '"content":"[^"]*"' 出力/メモ答え | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[指示: 短く\n\n## これまでのスレッドで分かったこと\n\n枝は ohanashi/x]'
           curl -s -o /dev/null -w '%{http_code}\n' -X DELETE $B/api/threads/1 | grep -x 404
           curl -s -o /dev/null -w '%{http_code}\n' $B/api/threads/999 | grep -x 404
           curl -s -X POST -d '{"thread":999}' $B/api/chat | grep -F '{"error":"その会話かスレッドはありません"}'
