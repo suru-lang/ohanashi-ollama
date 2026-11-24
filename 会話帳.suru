@@ -1,0 +1,119 @@
+# 会話帳: 会話と発言を SQLite のデータベースにしまう
+#   道 を 帳準備する                     … 表がなければ作る
+#   道 を 処理 で 帳使用する              … 開いて 処理 に渡し、終わったら(失敗しても)閉じる
+# 会話の一覧・中身は、画面へそのまま返せるように JSON にして返します。
+
+「標準」 を 読み込んで 使う
+「JSON」 を 読み込んで 使う
+「SQLite」 を 読み込んで 使う
+「時間」 を 読み込む
+
+# 温度が負なら、モデルの既定の温度を使う
+会話 とは 番号 と 題 と モデル と 指示 と 温度 の 組
+発言 とは 役 と 内容 の 組
+
+# --- 開く・閉じる ---
+
+文字列 を （SQLite接続 を 受け取って 甲 を 返す 入出力動作 を 返すこと） で 帳使用する は 甲 を 返す 入出力動作
+道 を 処理 で 帳使用する とは 入出力手順
+  db とは 道 を SQLite開封した 結果
+  db に 「PRAGMA foreign_keys = ON」 を SQLite実行する
+  db に 「PRAGMA busy_timeout = 5000」 を SQLite問合する
+  （db を 処理する） を （db を SQLite閉鎖する） で 後始末実行する
+
+文字列 を 帳準備する は 数 を 返す 入出力動作
+道 を 帳準備する とは 道 を 表作成すること で 帳使用する
+
+SQLite接続 を 表作成する は 数 を 返す 入出力動作
+db を 表作成する とは
+  db に 表の文 を SQLite実行する
+ただし 表の文 とは 「PRAGMA journal_mode = WAL;」
+    + 「CREATE TABLE IF NOT EXISTS 会話 (番号 INTEGER PRIMARY KEY, 題 TEXT NOT NULL, モデル TEXT NOT NULL, 指示 TEXT NOT NULL DEFAULT '', 温度 REAL NOT NULL DEFAULT -1, 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
+    + 「CREATE TABLE IF NOT EXISTS 発言 (番号 INTEGER PRIMARY KEY, 会話 INTEGER NOT NULL REFERENCES 会話(番号) ON DELETE CASCADE, 役 TEXT NOT NULL, 内容 TEXT NOT NULL, 作成 REAL NOT NULL);」
+    + 「CREATE INDEX IF NOT EXISTS 発言_会話 ON 発言 (会話, 番号);」
+
+# --- SQL の値から取り出す ---
+
+SQL値 を 値文字列にする は 文字列 を 返す
+（s という SQL文字列） を 値文字列にする とは s
+v を 値文字列にする とは 「」
+
+SQL値 を 値数にする は 数 を 返す
+（n という SQL数） を 値数にする とは n
+v を 値数にする とは 0
+
+# --- 会話 ---
+
+# 新しい会話を作り、その番号を結果にする
+SQLite接続 に 文字列 を 文字列 で 会話作成する は 数 を 返す 入出力動作
+db に 題 を モデル で 会話作成する とは 入出力手順
+  今 とは 時間内の現在時刻取得した 結果
+  db に 「INSERT INTO 会話 (題, モデル, 作成, 更新) VALUES (?, ?, ?, ?)」 を （（題 の SQL文字列） と （モデル の SQL文字列） と （今 の SQL数） と （今 の SQL数）） で SQLite差込実行する
+  db を SQLite最終行番号取得する
+
+# 会話の一覧(新しく話した順): [{"id":1,"title":"…","model":"…","updated":…}, …]
+SQLite接続 を 会話一覧取得する は JSON を 返す 入出力動作
+db を 会話一覧取得する とは 入出力手順
+  行群 とは db に 「SELECT 番号, 題, モデル, 更新 FROM 会話 ORDER BY 更新 DESC, 番号 DESC」 を SQLite問合した 結果
+  （行群 の それぞれ を 一覧項目にする） の JSON配列 を 結果にする
+
+SQL値 の リスト を 一覧項目にする は JSON を 返す
+行 を 一覧項目にする とは
+  （（「id」 と （（行 から 1 を 番目取得して 値数にする） の JSON数） の JSON項目） と （「title」 と （（行 から 2 を 番目取得して 値文字列にする） の JSON文字列） の JSON項目） と （「model」 と （（行 から 3 を 番目取得して 値文字列にする） の JSON文字列） の JSON項目） と （「updated」 と （（行 から 4 を 番目取得して 値数にする） の JSON数） の JSON項目）） の JSON物
+
+# 番号の会話(なければ 無)
+SQLite接続 から 数 を 会話取得する は 会話 の 有無 を 返す 入出力動作
+db から 番号 を 会話取得する とは 入出力手順
+  行群 とは db に 「SELECT 番号, 題, モデル, 指示, 温度 FROM 会話 WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
+  行群 を 会話行にして 結果にする
+
+SQL値 の リスト の リスト を 会話行にする は 会話 の 有無 を 返す
+空 を 会話行にする とは 無
+（先頭 は 行 で 残り は 他） を 会話行にする とは
+  （番号 は （行 から 1 を 番目取得して 値数にする） で 題 は （行 から 2 を 番目取得して 値文字列にする） で モデル は （行 から 3 を 番目取得して 値文字列にする） で 指示 は （行 から 4 を 番目取得して 値文字列にする） で 温度 は （行 から 5 を 番目取得して 値数にする） の 会話） の 有
+
+# 会話の発言(古い順)
+SQLite接続 から 数 を 発言一覧取得する は 発言 の リスト を 返す 入出力動作
+db から 番号 を 発言一覧取得する とは 入出力手順
+  行群 とは db に 「SELECT 役, 内容 FROM 発言 WHERE 会話 = ? ORDER BY 番号」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
+  行群 の それぞれ を 発言行にして 結果にする
+
+SQL値 の リスト を 発言行にする は 発言 を 返す
+行 を 発言行にする とは 役 は （行 の 先頭 を 値文字列にする） で 内容 は （行 の 最後 を 値文字列にする） の 発言
+
+# 題・モデル・指示・温度を書きかえる
+SQLite接続 に 会話 を 会話更新する は 数 を 返す 入出力動作
+db に c を 会話更新する とは
+  db に 「UPDATE 会話 SET 題 = ?, モデル = ?, 指示 = ?, 温度 = ? WHERE 番号 = ?」 を （（c の 題 の SQL文字列） と （c の モデル の SQL文字列） と （c の 指示 の SQL文字列） と （c の 温度 の SQL数） と （c の 番号 の SQL数）） で SQLite差込実行する
+
+# 会話を消す(発言も消える)。消した数を結果にする
+SQLite接続 から 数 を 会話削除する は 数 を 返す 入出力動作
+db から 番号 を 会話削除する とは
+  db に 「DELETE FROM 会話 WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
+
+# --- 発言 ---
+
+# 発言を会話の終わりに足し、会話の更新の時刻を今にする
+SQLite接続 に 数 へ 発言 を 発言追加する は 数 を 返す 入出力動作
+db に 番号 へ m を 発言追加する とは 入出力手順
+  今 とは 時間内の現在時刻取得した 結果
+  db に 「INSERT INTO 発言 (会話, 役, 内容, 作成) VALUES (?, ?, ?, ?)」 を （（番号 の SQL数） と （m の 役 の SQL文字列） と （m の 内容 の SQL文字列） と （今 の SQL数）） で SQLite差込実行する
+  db に 「UPDATE 会話 SET 更新 = ? WHERE 番号 = ?」 を （（今 の SQL数） と （番号 の SQL数）） で SQLite差込実行する
+
+# 最後の発言が AI の答え(assistant)なら消す(答えを作り直すとき)。消した数を結果にする
+SQLite接続 から 数 を 最後答え削除する は 数 を 返す 入出力動作
+db から 番号 を 最後答え削除する とは
+  db に 「DELETE FROM 発言 WHERE 番号 = (SELECT 番号 FROM 発言 WHERE 会話 = ? ORDER BY 番号 DESC LIMIT 1) AND 役 = 'assistant'」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込実行する
+
+# --- JSON にする ---
+
+発言 を 発言JSONにする は JSON を 返す
+m を 発言JSONにする とは
+  （（「role」 と （m の 役 の JSON文字列） の JSON項目） と （「content」 と （m の 内容 の JSON文字列） の JSON項目）） の JSON物
+
+# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"messages":[…]}
+会話 を 発言 の リスト で 会話JSONにする は JSON を 返す
+c を 発言群 で 会話JSONにする とは
+  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「messages」 と （（発言群 の それぞれ を 発言JSONにする） の JSON配列） の JSON項目）） の JSON物
+
+値文字列にする と 値数にする と 一覧項目にする と 会話行にする と 発言行にする は 非公開とする
