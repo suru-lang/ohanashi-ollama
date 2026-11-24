@@ -200,6 +200,7 @@ jobs:
         run: |
           rm -rf 出力/裸 出力/種 出力/作業G 出力/GitHub作業.db
           git init -q --bare --initial-branch=main 出力/裸/o/r.git
+          git init -q --bare --initial-branch=main 出力/裸/o/empty.git
           git clone -q 出力/裸/o/r.git 出力/種
           printf '# 試し\n' > 出力/種/README.md
           git -C 出力/種 add README.md
@@ -207,7 +208,7 @@ jobs:
           git -C 出力/種 push -q origin HEAD:main
           ./出力/偽Ollama 11440 > 出力/偽Ollama8.log 2>&1 &
           F=$!
-          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11440 --db 出力/GitHub作業.db --port 8100 --work 出力/作業G --sandbox-image python:3.12-slim --github-api http://127.0.0.1:11440 --github-git "file://$PWD/出力/裸" --github-repos o/r > 出力/アプリ8.log 2>&1 &
+          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11440 --db 出力/GitHub作業.db --port 8100 --work 出力/作業G --sandbox-image python:3.12-slim --github-api http://127.0.0.1:11440 --github-git "file://$PWD/出力/裸" --github-repos o/r,o/empty > 出力/アプリ8.log 2>&1 &
           A=$!
           for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8100/ && break; sleep 0.2; done
           B=http://127.0.0.1:8100
@@ -245,6 +246,12 @@ jobs:
           grep -F 'head\:\ohanashi/test\' 出力/git答え3.文
           grep -F 'base\:\main\' 出力/git答え3.文
           grep -F '直しました\\n\\n— ohanashi-ollama(偽) で書きました' 出力/git答え3.文
+          # 空のリポジトリは、はじめの commit を既定の枝に push できる
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":true},{"repo":"o/empty","write":true}]}' $B/api/conversations/1 > /dev/null
+          話す '空を clone して' | grep -F '"summary":"🐙 o/empty を /work/empty に clone しました(空のリポジトリ)"'
+          printf 'はじめ\n' > 出力/作業G/1/empty/README.md
+          話す '空に push して' | grep -F '"summary":"🐙 o/empty の枝 main に push しました('
+          [ "$(git --git-dir 出力/裸/o/empty.git show main:README.md)" = はじめ ]
           # 読むだけにすると、push の道具を渡さない
           curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":false}]}' $B/api/conversations/1 > /dev/null
           話す 'push して' | grep -c 'push しています' | grep -x 0
