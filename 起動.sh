@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
-case "$WATCH" in ''|*[!0-9]*) echo "--watch には秒(整数)を書いてください: $WATCH" >&2; exit 2 ;; esac
+case "$WATCH" in ''|*[!0-9]*) echo "--watch には秒(整数)を書いてください: ${WATCH}" >&2; exit 2 ;; esac
 
 CTRL=出力/制御
 STATE="$CTRL/状態"
@@ -47,7 +47,7 @@ revision() { git rev-parse --short HEAD 2>/dev/null || true; }
 start_app() {
   "$APP" --control "$CTRL" --revision "$(revision)" "$@" &
   PID=$!
-  log "動かしました(pid $PID、版 $(revision))"
+  log "動かしました(pid ${PID}、版 $(revision))"
 }
 
 stop_app() {
@@ -101,7 +101,7 @@ main() {
     sleep 2
     if ! kill -0 "$PID" 2>/dev/null; then
       wait "$PID"; rc=$?
-      log "アプリが終わりました(終了コード $rc)"
+      log "アプリが終わりました(終了コード ${rc})"
       exit "$rc"
     fi
     why=
