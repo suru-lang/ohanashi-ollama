@@ -13,6 +13,7 @@
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
 - 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
+- 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -53,6 +54,9 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
 | `--control フォルダ` | 起動.sh と話すフォルダ(起動.sh が付けます) | なし(画面から再起動できない) |
 | `--revision 版` | 画面に出す版(起動.sh がコミットを付けます) | なし |
+| `--github-repos 一覧` | 会話に足してよい GitHub のリポジトリ(`owner/名前` か `owner/*` を「,」で区切る) | なし(GitHub を使わない) |
+| `--github-token 鍵` | GitHub の鍵(個人アクセストークン) | 環境変数 `GITHUB_TOKEN`、なければ鍵なし(公開のリポジトリだけ、1時間に60回まで) |
+| `--github-api URL` | GitHub の API の基点(GitHub Enterprise なら `https://主機/api/v3`) | `https://api.github.com` |
 
 ### 起動.sh で動かす(画面から再起動・新しいコミットで更新)
 
@@ -118,12 +122,31 @@ OLLAMA_API_KEY=キー kumu 実行
 
 コンテナは会話を消すと消えます(作業フォルダは残ります)。モデルが動かすコマンドは確かめずに行うので、作業フォルダに大事なファイルを置かないでください。
 
+### GitHub のリポジトリを読む
+
+使ってよいリポジトリを `--github-repos` で決めて起動します。鍵は環境変数で渡すと、`ps` に出ません。
+
+```sh
+GITHUB_TOKEN=github_pat_… kumu 実行 -- --github-repos suru-lang/suru,suru-lang/*
+```
+
+起動すると「GitHub: 名前 としてつながりました。使えるリポジトリ: …」と出ます(鍵が違えば「注意: GitHub の鍵を確かめられませんでした(…)」)。画面の ⚙ の設定の「GitHub のリポジトリ」で、その会話で使うリポジトリを足し、それぞれ「読むだけ」か「読み書き」を選びます(`--github-repos` に合うものだけ足せます)。入力欄の横の「🐙 GitHub」を押して送ると、モデルに4つの道具を渡します。
+
+- `github_repo`: リポジトリの設定(既定の枝・説明・トピック・ラベル)
+- `github_tree`: ファイルの一覧(枝と、フォルダで絞れる。400 まで)
+- `github_file`: ファイルの中身(20000 文字まで)
+- `github_issues`: issue・PR の一覧(50 まで)か、1つの本文とコメント
+
+画面には「🐙 o/r の README.md を読みました(2 行)」のように、何を読んだかだけを出します。読んだ中身はモデルにだけ渡し、答えといっしょには保存しません。
+
+鍵は fine-grained の個人アクセストークンで、読むリポジトリに Metadata・Contents・Issues・Pull requests の読みの権限を付けてください。「読み書き」はまだ選んで覚えるだけで、書く道具(issue やコメントを書く)はこれから足します。
+
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
 ## 試験
 
 ```sh
-kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数の試験
+kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許しの試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
 ```
 
@@ -136,7 +159,7 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435   # SearXNG で試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -147,28 +170,29 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
-| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL` |
+| [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む)と、会話のリポジトリの許し |
+| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
 
-依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) です。
+依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)です。
 
 ### サーバーの道
 
 | 道 | 答え |
 |---|---|
-| `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽}` |
+| `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"github":真偽,"githubRepos":[…],"githubUser":…}` |
 | `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
 | `GET /api/conversations` | 会話の一覧(新しく話した順) |
 | `POST /api/search` | 題か発言に言葉を含む会話 `{"q":…}` → `[{"id":…,"title":…,"snippet":…}, …]` |
 | `POST /api/conversations` | 会話を作る `{"model":…}` |
-| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)を変える・消す |
+| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)を変える・消す |
 | `POST /api/conversations/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
 | `DELETE /api/conversations/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を渡す |
+| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
-流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。WebSocket では最後に `{"done":true}` を送ります。
+流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
 
 ## 決めたこと
 
@@ -214,6 +238,15 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 2. **ファイルで話す。** アプリは `POST /api/restart` で `出力/制御/再起動` のファイルを置くだけです。`起動.sh` は2秒ごとにそれを見ます。様子は `起動.sh` が `出力/制御/状態` に書き、アプリは `/api/info` の `update` で画面に渡します。
 3. **作れてから止める。** 新しいアプリが作れたときだけ、前のアプリを止めて動かし直します。止まっている間は数秒です。
 4. **動かし直したかは時刻で知る。** `/api/info` の `started`(動き始めた時刻)が変わったら、画面を読み直します。
+
+### GitHub
+
+1. **API は suru-lang/github で。** GitHub の API を使うところは、ほかのアプリでも使えるように [suru-lang/github](https://github.com/suru-lang/github) に分けました。このアプリには、モデルの道具と、会話のリポジトリの許しだけを置きます。
+2. **リポジトリは2重に絞る。** 起動の `--github-repos` で足してよいものを決め、会話ごとに使うものを足します。サーバーは会話を保存するときに `--github-repos` に合わないものを除き、道具を行うときにも、会話にないリポジトリなら断ってモデルに理由を返します。英字の大文字小文字は区別しません。
+3. **Read と Write は会話ごと・リポジトリごと。** Claude のように、会話にリポジトリを足すときに「読むだけ」か「読み書き」を選びます。会話帳の `倉` の列に `[{"repo":…,"write":真偽}]` の JSON でしまいます(前の版の表には、起動したときに `ALTER TABLE` で足します)。
+4. **読むのは確かめずに行う。** 読む道具は、画面で確かめずに行います。書く道具は「読み書き」のリポジトリにだけ渡す予定です。issue を消す道具は作らず、閉じる(`not_planned`)で足ります。
+5. **中身は保存しない。** 読んだファイルや issue は長く、リポジトリはあとで変わるので、モデルに渡すだけにします。画面には何を読んだかの1行だけを出し、それを答えといっしょに保存します。
+6. **鍵は出さない。** 鍵は起動の記録にも画面にも出しません。`/api/info` は、鍵の持ち主の名前(`githubUser`)だけを返します。
 
 ## 今後の候補
 

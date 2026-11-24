@@ -5,6 +5,8 @@
 // 出典は答えの終わりに Markdown の番号付きの一覧として足して、答えといっしょに保存します。
 // {"code":true} も送ると、モデルが砂場(Docker のコンテナ)でコマンドを動かします。動かす前に {"running":…}、
 // 動かした後に {"tool":…} が届くので、コマンドと出力を答えの中に Markdown のコードの塊として足します。
+// {"github":true} も送ると、モデルが会話のリポジトリ(⚙ で足す。Read か Write)を GitHub から読みます。
+// 読む前に {"running":…}、読んだ後に {"tool":{"name":"github_…","summary":…}} が届き、summary の1行を答えに残します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
 
 const $ = (id) => document.getElementById(id);
@@ -16,12 +18,16 @@ const モデル欄 = $("モデル");
 const 題欄 = $("題");
 const ウェブボタン = $("ウェブ");
 const 砂場ボタン = $("砂場");
+const GitHubボタン = $("GitHub");
 
 let 今 = null;          // 開いている会話 {id, title, model, system, temperature, messages}
 let 中断 = null;        // 答えを受け取っている間の AbortController
 let 接続 = null;        // 開いている WebSocket
 let WebSocket可 = true; // つなげなかったら、fetch に切り替える
 let モデル群 = [];
+let 新規倉 = [];        // まだ会話を作っていないときに ⚙ で足したリポジトリ
+let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)
+let 倉案内文 = "";
 
 // --- サーバーとのやりとり ---
 
@@ -292,6 +298,77 @@ function 砂場切替(押す) {
 }
 砂場ボタン.addEventListener("click", () => 砂場切替(!砂場中()));
 
+// --- GitHub を読む ---
+
+function GitHub中() { return !GitHubボタン.disabled && GitHubボタン.getAttribute("aria-pressed") === "true"; }
+function GitHub切替(押す) {
+  GitHubボタン.setAttribute("aria-pressed", String(押す));
+  保存する("GitHub", 押す ? "1" : "");
+}
+GitHubボタン.addEventListener("click", () => GitHub切替(!GitHub中()));
+
+function 今の倉() { return 今 ? (今.repos || []) : 新規倉; }
+
+function 倉一覧表示() {
+  const 一覧 = $("倉一覧");
+  一覧.textContent = "";
+  const 群 = 今の倉();
+  for (const x of 群) {
+    const li = document.createElement("li");
+    const 名 = document.createElement("span");
+    名.className = "倉名";
+    名.textContent = x.repo;
+    const 権 = document.createElement("select");
+    権.setAttribute("aria-label", `${x.repo} の権限`);
+    for (const [値, 字] of [["read", "Read"], ["write", "Write"]]) {
+      const o = document.createElement("option");
+      o.value = 値;
+      o.textContent = 字;
+      権.append(o);
+    }
+    権.value = x.write ? "write" : "read";
+    権.addEventListener("change", () => 倉保存(群.map((y) => (y.repo === x.repo ? { repo: y.repo, write: 権.value === "write" } : y))));
+    const 外 = document.createElement("button");
+    外.type = "button";
+    外.className = "小";
+    外.textContent = "外す";
+    外.setAttribute("aria-label", `${x.repo} を外す`);
+    外.addEventListener("click", () => 倉保存(群.filter((y) => y.repo !== x.repo)));
+    li.append(名, 権, 外);
+    一覧.append(li);
+  }
+  if (!群.length) {
+    const li = document.createElement("li");
+    li.className = "淡 小字";
+    li.textContent = "まだありません。下で足すと、🐙 を押したときにモデルが読みます。";
+    一覧.append(li);
+  }
+}
+
+async function 倉保存(群) {
+  if (!今) { 新規倉 = 群; 倉一覧表示(); return; }
+  try { 今 = await API(`conversations/${今.id}`, "PUT", { repos: 群 }); }
+  catch (e) { 知らせる(`リポジトリを変えられませんでした(${e.message})`); }
+  倉一覧表示();
+}
+
+// 「owner/*」で許しているときは、そのどれでも足せる。足せるかはサーバーも確かめる
+function 許可済(倉) {
+  const 小 = 倉.toLowerCase();
+  return 許可倉.some((p) => { const q = p.toLowerCase(); return q.endsWith("/*") ? 小.startsWith(q.slice(0, -1)) && !小.slice(q.length - 1).includes("/") : 小 === q; });
+}
+
+$("倉足す").addEventListener("click", async () => {
+  const 倉 = $("倉名").value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/$/, "");
+  if (!/^[\w.-]+\/[\w.-]+$/.test(倉)) { $("倉案内").textContent = "owner/名前 の形で書いてください"; return; }
+  if (!許可済(倉)) { $("倉案内").textContent = `${倉} は使えません。起動するときの --github-repos(${許可倉.join(", ")})に入るものだけです`; return; }
+  $("倉案内").textContent = 倉案内文;
+  const 群 = 今の倉().filter((y) => y.repo.toLowerCase() !== 倉.toLowerCase());
+  await 倉保存([...群, { repo: 倉, write: $("倉権限").value === "write" }]);
+  $("倉名").value = "";
+});
+$("倉名").addEventListener("keydown", (e) => { if (e.key === "Enter" && !変換中(e)) { e.preventDefault(); $("倉足す").click(); } });
+
 const 拡張子言語 = { py: "python", js: "javascript", ts: "typescript", sh: "sh", rb: "ruby", go: "go", rs: "rust", c: "c", h: "c", cpp: "cpp", java: "java", html: "html", css: "css", json: "json", md: "markdown", yml: "yaml", yaml: "yaml", toml: "toml", sql: "sql", suru: "suru" };
 
 // 道具を使った跡を Markdown にする。中身に ``` があっても壊れないように ~~~~ で囲む
@@ -306,6 +383,7 @@ function 道具文(t) {
     const 言語 = 拡張子言語[(t.path || "").split(".").pop()] || "";
     return `\n\n📝 \`${t.path}\`(${t.output})\n\n${囲}${言語}\n${(t.content || "").replace(/\n$/, "")}\n${囲}\n\n`;
   }
+  if ((t.name || "").startsWith("github_")) return `\n\n${t.summary || t.name}\n\n`;
   return `\n\n${t.name}: ${t.output || ""}\n\n`;
 }
 
@@ -382,6 +460,7 @@ function 設定欄表示() {
   $("温度").value = 温度 < 0 ? 0.8 : 温度;
   $("温度値").textContent = $("温度").value;
   $("砂場網").checked = 今 ? 今.network : false;
+  倉一覧表示();
 }
 
 function 設定の値() {
@@ -522,8 +601,8 @@ async function 答えてもらう() {
     if (通知.stats) 統計 = 通知.stats;
     if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
     if (通知.notice) 調べ欄.textContent = `${通知.notice}`;
-    if (通知.running) 調べ欄.textContent = `💻 動かしています: ${通知.running}`;
-    if (通知.tool) { 答え += 道具文(通知.tool); 調べ欄.textContent = "💻 砂場で動かしました"; }
+    if (通知.running) 調べ欄.textContent = 通知.running.startsWith("🐙") ? 通知.running : `💻 動かしています: ${通知.running}`;
+    if (通知.tool) { 答え += 道具文(通知.tool); 調べ欄.textContent = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
     if (!調べ欄.isConnected && (通知.notice || 通知.running)) el.prepend(調べ欄);
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
   };
@@ -532,6 +611,7 @@ async function 答えてもらう() {
     const 頼み = { conversation: 今.id };
     if (ウェブ) 頼み.web = true;
     if (砂場) 頼み.code = true;
+    if (GitHub中()) 頼み.github = true;
     await 聞く(JSON.stringify(頼み), 受け取る, 中断.signal);
   } catch (e) {
     if (e.name === "AbortError") 止めた = true;
@@ -581,7 +661,8 @@ async function 送る() {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
       今 = await API("conversations", "POST", { model: モデル欄.value });
-      if ($("指示").value || !$("温度既定").checked || $("砂場網").checked) 今 = await API(`conversations/${今.id}`, "PUT", 設定の値());
+      if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
+      新規倉 = [];
       history.replaceState(null, "", `#${今.id}`);
     }
     文欄.value = "";
@@ -680,6 +761,17 @@ $("再起動").addEventListener("click", 再起動する);
     }
     起動時 = i.started;
     if (i.restart) { $("更新欄").hidden = false; 版表示(i); }
+    if (i.github) {
+      GitHubボタン.disabled = false;
+      GitHubボタン.title = "押してあると、モデルが会話のリポジトリ(⚙ で足す)を GitHub から読みます";
+      GitHub切替(保存値("GitHub", "") === "1");
+      許可倉 = i.githubRepos || [];
+      $("倉候補").textContent = "";
+      for (const p of 許可倉.filter((p) => !p.endsWith("/*"))) { const o = document.createElement("option"); o.value = p; $("倉候補").append(o); }
+      $("倉欄").hidden = false;
+      倉案内文 = (i.githubUser ? `${i.githubUser} として読みます。` : "鍵がないので、公開のリポジトリだけ読めます。") + `足せるのは ${許可倉.join(", ")} です。`;
+      $("倉案内").textContent = 倉案内文;
+    }
     if (i.web) {
       ウェブボタン.disabled = false;
       ウェブボタン.title = "押してあると、ウェブで調べてから答えます";

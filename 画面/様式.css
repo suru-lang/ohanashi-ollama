@@ -129,6 +129,13 @@ select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-
 #設定欄 .行 { display: flex; flex-wrap: wrap; gap: 16px; }
 #設定欄 p { margin: 0; }
 #設定欄 [hidden] { display: none; }
+#倉欄 { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; }
+#倉欄 .欄名 { font-size: 0.9rem; }
+#倉一覧 { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+#倉一覧 li { display: flex; align-items: center; gap: 8px; }
+#倉一覧 .倉名 { font-family: ui-monospace, monospace; }
+#設定欄 .倉追加 { gap: 6px; align-items: center; }
+#倉名 { flex: 1; min-width: 10em; }
 #知らせ { padding: 8px 16px; font-size: 0.9rem; }
 #知らせ.誤り { background: color-mix(in srgb, var(--誤) 12%, var(--面)); color: var(--誤); }
 
