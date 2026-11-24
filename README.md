@@ -4,7 +4,8 @@
 
 - モデルを画面で選べます(Ollama に入っているモデルの一覧から)
 - 会話は SQLite のファイルにしまうので、閉じても続きから話せます。左の一覧から前の会話を開けます
-- 左の「会話を探す」で、題と発言の中身から会話を探せます。開くと見つかった所に印が付きます
+- 会話の中に話題ごとの「スレッド」を作れます(見出しの「＋ スレッド」)。モデルに送るのはそのスレッドの発言だけなので、長くなっても速いままです。リポジトリ・指示・モデルなどの設定は会話のものを、どのスレッドでもそのまま使います
+- 左の「会話を探す」で、題と発言の中身からスレッドを探せます。開くと見つかった所に印が付きます
 - 答えは届いたところから少しずつ出ます。「止める」で途中で止められます(そこまでの答えは残ります)
 - 答えの Markdown(コード・箇条書き・表など)を整えて出し、コードは「写す」でコピーできます
 - 会話ごとに、指示(システムプロンプト)と温度を決められます
@@ -174,7 +175,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 
 - 道具の名前・リポジトリ・枝を書く: 「github_push ツールを使って、ohanashi/add-c-hello-world ブランチに push してください」「github_pr ツールを使って、ohanashi/add-c-hello-world ブランチから main ブランチに対して PR を開いてください」
 - clone → 直す → push → PR を、1回に1つずつ頼む
-- 作業ごとに新しい会話にする(長い会話では、前の失敗や作り話に引きずられます)
+- 作業ごとに新しいスレッドにする(見出しの「＋ スレッド」。長いスレッドでは、前の失敗や作り話に引きずられます)。リポジトリの設定と、砂場に clone したものはそのまま使えます
 - 本当に道具を使ったかは、途中経過の題(「途中経過(道具: github_push)」)か、起動した端末の `[会話 番号] 道具 …` の行で確かめる
 
 #### 鍵の作り方
@@ -194,6 +195,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 ```sh
 kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許しの試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
+node 道具/道試験.js          # 画面の道(#会話/スレッド)の試験
 ```
 
 本物の LLM の代わりに、決まった答えを返す偽の Ollama([道具/偽Ollama.suru](道具/偽Ollama.suru))で、全部を動かして確かめられます。
@@ -220,7 +222,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
-| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
+| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道) |
 
 依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)です。
 
@@ -239,7 +241,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET・PUT・DELETE /api/threads/番号` | スレッドの中身 `{"id":…,"conversation":…,"title":…,"messages":[…]}` を読む・題を変える・消す(会話の最後のスレッドは消せない) |
 | `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
 | `DELETE /api/threads/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しいスレッドに発言を足す・最後の答えを消して、会話の中身(`"messages"` は一番新しいスレッドの発言)を返す |
+| `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しく作ったスレッドに発言を足す・最後の答えを消して、スレッドの中身を返す |
 | `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
@@ -265,6 +267,10 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 5. **前の道も残す。** `/api/conversations/番号/messages`・`/last-answer` と WebSocket の `{"conversation":番号}` は、その会話の一番新しく作ったスレッドのこととして動きます。開いたままの前の版の画面でも話せるようにするためです。
 6. **題はスレッドごと。** スレッドに最初の問いを足すと、その1行目のはじめの 40 文字をスレッドの題にします(会話の題が空なら、会話の題にも)。
 7. **会話の最後のスレッドは消せない。** スレッドのない会話を作らないように、最後の1つを消すときは会話ごと消します。
+8. **画面の道は `#会話/スレッド`。** 読み込み直しても同じスレッドを開きます。前の版の `#会話` のリンクは、その会話の一番新しく話したスレッドを開きます。道の読み書きは `画面/道.js` にまとめ、`node 道具/道試験.js` で確かめます。
+9. **一覧は開いている会話の下にスレッドを並べる。** スレッドが2つ以上あるときだけ、開いている会話の下に、新しく話した順に並べます。ほかの会話はたたんだまま、スレッドの数だけを出します。会話を探したときは、見つかったスレッドを「会話の題 › スレッドの題」で並べます。
+10. **見出しの題は2つ。** 大きいほうがスレッドの題、その前の小さいほうが会話の題で、どちらも押すと変えられます。会話の中身(`GET /api/conversations/番号`)は設定とスレッドの一覧だけを返し、発言はスレッドの中身で読みます。
+11. **答えはそのスレッドにしまう。** 答えを受け取っている間にほかのスレッドを開くと、今までと同じく答えを止めますが、そこまでの答えは頼んだスレッドにしまいます。
 
 ### 画面
 

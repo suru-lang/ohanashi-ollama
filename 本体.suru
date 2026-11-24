@@ -11,13 +11,13 @@
 #   GET    /api/conversations                … 会話の一覧(新しく話した順)
 #   POST   /api/search                       … 題か発言に q を含む会話 {"q":…} → [{"id":…,"snippet":…}, …]
 #   POST   /api/conversations                … 会話を作る {"model":…} → {"id":…}
-#   GET    /api/conversations/番号           … 会話の中身(設定とスレッドの一覧。messages は一番新しいスレッドの発言)
+#   GET    /api/conversations/番号           … 会話の中身(設定とスレッドの一覧)
 #   PUT    /api/conversations/番号           … 題・モデル・指示・温度・砂場のネットワーク・GitHub のリポジトリを変える
 #   DELETE /api/conversations/番号           … 会話を消す(スレッドと発言も)
 #   GET    /api/conversations/番号/threads   … スレッドの一覧(新しく話した順)
 #   POST   /api/conversations/番号/threads   … スレッドを作る {"title":…}(省ける)→ スレッドの中身
-#   POST   /api/conversations/番号/messages  … 一番新しいスレッドに発言を足す(前の画面のため)
-#   DELETE /api/conversations/番号/last-answer … 一番新しいスレッドの最後の答えを消す(前の画面のため)
+#   POST   /api/conversations/番号/messages  … 一番新しいスレッドに発言を足す(前の版の道)→ スレッドの中身
+#   DELETE /api/conversations/番号/last-answer … 一番新しいスレッドの最後の答えを消す(前の版の道)→ スレッドの中身
 #   GET    /api/threads/番号                 … スレッドの中身 {"id":…,"conversation":…,"title":…,"messages":[…]}
 #   PUT    /api/threads/番号                 … スレッドの題を変える {"title":…}
 #   DELETE /api/threads/番号                 … スレッドを消す(会話の最後のスレッドは消せない)
@@ -131,11 +131,9 @@ s で 問い を n へ 会話応答する とは
 SQLite接続 から 数 を 中身応答する は HTTP内の応答 を 返す 入出力動作
 db から n を 中身応答する とは 入出力手順
   c とは db から n を 会話帳内の会話取得した 結果
-  筋 とは db から n を 会話帳内の最新スレッド取得した 結果
-  群 とは db から 筋 を 会話帳内の発言一覧取得した 結果
   筋群 とは db から n を 会話帳内のスレッド一覧取得した 結果
   もし c が
-    x という 有 ならば （x に 筋群 を 群 で 会話帳内の会話JSONにして JSON応答にする） を 結果にする
+    x という 有 ならば （x を 筋群 で 会話帳内の会話JSONにして JSON応答にする） を 結果にする
     そうでなければ （404 で 「その会話はありません」 を 誤り応答にする） を 結果にする
 
 # 本文にある項目だけ変える
@@ -177,7 +175,7 @@ db から n を 消去応答する とは 入出力手順
   もし 消した数 = 0 ならば （404 で 「その会話はありません」 を 誤り応答にする） を 結果にする そうでなければ （（「deleted」 と （真 の JSON真偽） の JSON項目） を 一項目にして JSON応答にする） を 結果にする
 
 # /api/conversations/番号/threads・/api/conversations/番号/messages・/api/conversations/番号/last-answer
-# messages と last-answer は、スレッドを知らない前の画面のために、一番新しいスレッドのこととする
+# messages と last-answer は前の版の道で、一番新しいスレッドのこととする
 設定 で HTTP内の要求 を 数 に 文字列 から 会話下応答する は HTTP内の応答 を 返す 入出力動作
 s で 問い を n に 下 から 会話下応答する とは
   もし 下 = 「threads」 かつ 問い の 方法 = 「POST」 ならば s の 帳 を （db を 受け取って （db に n を （問い の 本文 を 安全解析する） で スレッド作成応答する） を 返すこと） で 会話帳内の帳使用する
@@ -187,19 +185,16 @@ s で 問い を n に 下 から 会話下応答する とは
   そうでなければ もし 下 = 「messages」 または 下 = 「last-answer」 または 下 = 「threads」 ならば （405 で 「方法が違います」 を 誤り応答にする） を 結果にする
   そうでなければ （404 で 「その道はありません」 を 誤り応答にする） を 結果にする
 
-# 会話の一番新しいスレッドに発言を足し、会話の中身を返す
+# 会話の一番新しいスレッドに発言を足し、そのスレッドの中身を返す
 SQLite接続 に 数 を JSON で 発言保存する は HTTP内の応答 を 返す 入出力動作
 db に n を j で 発言保存する とは 入出力手順
   筋 とは db から n を 会話帳内の最新スレッド取得した 結果
-  r とは db に 筋 を j で 発言付加した 結果
-  もし r = 0 ならば db から n を 中身応答する
-  そうでなければ （r を 足し誤り応答にする） を 結果にする
+  db に 筋 を j で 筋発言保存する
 
 SQLite接続 から 数 を 答え消去応答する は HTTP内の応答 を 返す 入出力動作
 db から n を 答え消去応答する とは 入出力手順
   筋 とは db から n を 会話帳内の最新スレッド取得した 結果
-  db から 筋 を 会話帳内の最後答え削除する
-  db から n を 中身応答する
+  db から 筋 を 筋答え消去応答する
 
 # 会話に空のスレッドを作り、その中身を返す
 SQLite接続 に 数 を JSON で スレッド作成応答する は HTTP内の応答 を 返す 入出力動作

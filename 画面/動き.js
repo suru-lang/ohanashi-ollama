@@ -1,5 +1,6 @@
 // おはなし の画面。会話はサーバーが SQLite にしまい、画面は送る前と答えの後に発言を保存します。
-// 答えは WebSocket(ws)で受け取ります。{"conversation":番号} を送ると、1つずつの JSON
+// 会話はモデル・指示・リポジトリなどの設定を持ち、その下に話題ごとのスレッドがあります。開いているスレッドは道の #会話/スレッド です。
+// 答えは WebSocket(ws)で受け取ります。{"thread":番号} を送ると、そのスレッドの発言を会話の設定で送り、1つずつの JSON
 // ({"content"}・{"thinking"}・{"stats"}・{"error"})が届き、最後に {"done":true} が届きます。
 // {"web":true} も送ると、サーバーが先にウェブで調べて {"sources":[…]}(できなければ {"notice":…})を送ります。
 // 出典は答えの終わりに Markdown の番号付きの一覧として足して、答えといっしょに保存します。
@@ -22,7 +23,8 @@ const ウェブボタン = $("ウェブ");
 const 砂場ボタン = $("砂場");
 const GitHubボタン = $("GitHub");
 
-let 今 = null;          // 開いている会話 {id, title, model, system, temperature, messages}
+let 今 = null;          // 開いている会話 {id, title, model, system, temperature, network, repos, threads}
+let 筋 = null;          // 開いているスレッド {id, conversation, title, messages}
 let 中断 = null;        // 答えを受け取っている間の AbortController
 let 接続 = null;        // 開いている WebSocket
 let WebSocket可 = true; // つなげなかったら、fetch に切り替える
@@ -111,7 +113,35 @@ function いつ(秒) {
   return d.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
 }
 
-// 検索欄に言葉があれば、その言葉を含む会話だけを出す
+// 一覧の1行(会話かスレッド)。題 は印を付ける文、下 はその下の淡い文
+function 一覧行(種類, 道, 題文, 下文, 語, 今か, 消す) {
+  const 行 = document.createElement("div");
+  行.className = "項目" + (種類 === "スレッド" ? " スレッド項目" : "") + (今か ? " 今" : "");
+  const a = document.createElement("a");
+  a.href = 道;
+  const 題 = document.createElement("span");
+  題.className = "項目題";
+  印付け(題, 題文, 語);
+  const 下 = document.createElement("span");
+  下.className = "淡 小字";
+  下.textContent = 下文;
+  a.append(題, 下);
+  行.append(a);
+  if (消す) {
+    const 消 = document.createElement("button");
+    消.type = "button";
+    消.className = "消す";
+    消.textContent = "🗑";
+    消.title = `この${種類}を消す`;
+    消.addEventListener("click", (e) => 消す確認(e, 消, 消す));
+    行.append(消);
+  }
+  return 行;
+}
+
+function 筋題(t) { return (t && t.title) || "新しいスレッド"; }
+
+// 検索欄に言葉があれば、その言葉を含むスレッドだけを出す。なければ会話を並べ、開いている会話の下にスレッドを並べる
 async function 一覧読込() {
   const 語 = 検索欄.value.trim();
   let 群 = [];
@@ -127,36 +157,35 @@ async function 一覧読込() {
     p.textContent = `「${語}」を含む会話はありません`;
     欄.append(p);
   }
-  for (const c of 群) {
-    const 行 = document.createElement("div");
-    行.className = "項目" + (今 && 今.id === c.id ? " 今" : "");
-    const a = document.createElement("a");
-    a.href = `#${c.id}`;
-    const 題 = document.createElement("span");
-    題.className = "項目題";
-    印付け(題, c.title || "新しい会話", 語);
-    const 下 = document.createElement("span");
-    下.className = "淡 小字";
-    下.textContent = `${いつ(c.updated)} · ${c.model}`;
-    a.append(題, 下);
-    if (語 && c.snippet) {
-      const 抜 = document.createElement("span");
-      抜.className = "抜粋 小字";
-      印付け(抜, 抜粋にする(c.snippet, 語), 語);
-      a.append(抜);
+  if (語) {
+    for (const c of 群) {
+      // 見つかったスレッド。題は「会話の題 › スレッドの題」
+      const 題 = (c.title || "新しい会話") + (c.threadTitle && c.threadTitle !== c.title ? ` › ${c.threadTitle}` : "");
+      const 行 = 一覧行("スレッド", 道を作る(c.id, c.thread), 題, `${いつ(c.updated)} · ${c.model}`, 語, 筋 && 筋.id === c.thread, null);
+      行.classList.remove("スレッド項目");
+      const a = 行.querySelector("a");
+      if (c.snippet) {
+        const 抜 = document.createElement("span");
+        抜.className = "抜粋 小字";
+        印付け(抜, 抜粋にする(c.snippet, 語), 語);
+        a.append(抜);
+      }
+      a.addEventListener("click", () => {
+        強調語 = 語;
+        if (筋 && 筋.id === c.thread) { 印消し(); 本文に印付け(); 横欄閉じる(); }
+      });
+      欄.append(行);
     }
-    a.addEventListener("click", () => {
-      強調語 = 語;
-      if (今 && 今.id === c.id) { 印消し(); 本文に印付け(); 横欄閉じる(); }
-    });
-    const 消 = document.createElement("button");
-    消.type = "button";
-    消.className = "消す";
-    消.textContent = "🗑";
-    消.title = "この会話を消す";
-    消.addEventListener("click", (e) => 消す確認(e, 消, c.id));
-    行.append(a, 消);
-    欄.append(行);
+    return;
+  }
+  for (const c of 群) {
+    const 開いている = 今 && 今.id === c.id;
+    const 下 = `${いつ(c.updated)} · ${c.model}` + (c.threads > 1 ? ` · ${c.threads} スレッド` : "");
+    欄.append(一覧行("会話", 道を作る(c.id, 0), c.title || "新しい会話", 下, "", 開いている && !(今.threads.length > 1), { 会話: c.id }));
+    if (!開いている || 今.threads.length < 2) continue;
+    for (const t of 今.threads) {
+      欄.append(一覧行("スレッド", 道を作る(c.id, t.id), 筋題(t), いつ(t.updated), "", 筋 && 筋.id === t.id, { スレッド: t.id }));
+    }
   }
 }
 
@@ -225,8 +254,8 @@ function 印消し() {
   for (const m of 会話欄.querySelectorAll(".本文 mark, .途中文 mark")) m.replaceWith(m.textContent);
 }
 
-// 1回目で「消す?」になり、もう1回押すと消す
-function 消す確認(e, ボタン, 番号) {
+// 1回目で「消す?」になり、もう1回押すと消す。何 は {会話:番号} か {スレッド:番号}
+function 消す確認(e, ボタン, 何) {
   e.preventDefault();
   if (!ボタン.classList.contains("確認")) {
     ボタン.classList.add("確認");
@@ -234,9 +263,11 @@ function 消す確認(e, ボタン, 番号) {
     setTimeout(() => { ボタン.classList.remove("確認"); ボタン.textContent = "🗑"; }, 3000);
     return;
   }
-  API(`conversations/${番号}`, "DELETE").then(() => {
-    if (今 && 今.id === 番号) 新規();
-    else 一覧読込();
+  const 道 = 何.会話 ? `conversations/${何.会話}` : `threads/${何.スレッド}`;
+  API(道, "DELETE").then(() => {
+    if (何.会話 && 今 && 今.id === 何.会話) 新規();
+    else if (何.スレッド && 筋 && 筋.id === 何.スレッド) 開く(今.id, 0);
+    else 会話読み直す().then(一覧読込);
   }).catch((err) => 知らせる(`消せませんでした(${err.message})`));
 }
 
@@ -244,23 +275,54 @@ function 消す確認(e, ボタン, 番号) {
 
 function 横欄閉じる() { document.body.classList.remove("横欄開"); $("覆い").hidden = true; }
 
-async function 開く(番号) {
+// 会話を開き、スレッド(0 なら一番新しく話したもの)を開く
+async function 開く(会話番号, スレッド番号) {
   if (中断) 中断.abort();
   try {
-    今 = await API(`conversations/${番号}`);
+    今 = await API(`conversations/${会話番号}`);
+    const 選 = 今.threads.some((t) => t.id === スレッド番号) ? スレッド番号 : 今.threads[0].id;
+    筋 = await API(`threads/${選}`);
   } catch (e) {
     知らせる(`会話を開けませんでした(${e.message})`);
     新規();
     return;
   }
+  const 道 = 道を作る(今.id, 筋.id);
+  if (location.hash !== 道) history.replaceState(null, "", 道);
   表示し直す();
   一覧読込();
   横欄閉じる();
 }
 
+// 開いている会話の設定とスレッドの一覧を読み直す
+async function 会話読み直す() {
+  if (!今) return;
+  try { 今 = await API(`conversations/${今.id}`); } catch { /* 次に開くときに読む */ }
+  会話題表示();
+}
+
+// 今の会話に新しいスレッドを作って開く。設定(リポジトリなど)は会話のものをそのまま使う
+async function 新スレッド() {
+  if (!今 || 中断) return;
+  try {
+    筋 = await API(`conversations/${今.id}/threads`, "POST", {});
+    今 = await API(`conversations/${今.id}`);
+  } catch (e) {
+    知らせる(`スレッドを作れませんでした(${e.message})`);
+    return;
+  }
+  history.pushState(null, "", 道を作る(今.id, 筋.id));
+  強調語 = "";
+  表示し直す();
+  一覧読込();
+  横欄閉じる();
+  文欄.focus();
+}
+
 function 新規() {
   if (中断) 中断.abort();
   今 = null;
+  筋 = null;
   if (location.hash) history.replaceState(null, "", location.pathname);
   表示し直す();
   一覧読込();
@@ -268,12 +330,22 @@ function 新規() {
   文欄.focus();
 }
 
+// 見出しの題: 大きいほうはスレッドの題、その前に小さく会話の題
+function 見出し題() { return 筋 ? 筋題(筋) : "新しい会話"; }
+function 会話題表示() {
+  $("会話題").hidden = !今;
+  $("新スレッド").hidden = !今;
+  if (今 && !$("会話題").isContentEditable) $("会話題").textContent = 今.title || "新しい会話";
+  if (!題欄.isContentEditable) 題欄.textContent = 見出し題();
+  document.title = 今 ? `${見出し題()}${今.title && 今.title !== 見出し題() ? ` - ${今.title}` : ""} - おはなし` : "おはなし";
+}
+
 function 表示し直す() {
   会話欄.querySelectorAll(".発言, .失敗").forEach((el) => el.remove());
-  $("ようこそ").hidden = !!(今 && 今.messages.length);
-  題欄.textContent = 今 ? (今.title || "新しい会話") : "新しい会話";
-  document.title = 今 && 今.title ? `${今.title} - おはなし` : "おはなし";
-  if (今) for (const m of 今.messages) 発言を足す(m.role, m.content);
+  const 群 = 筋 ? 筋.messages : [];
+  $("ようこそ").hidden = !!群.length;
+  会話題表示();
+  for (const m of 群) 発言を足す(m.role, m.content);
   モデル欄表示();
   設定欄表示();
   作り直しボタン付け();
@@ -491,7 +563,7 @@ function 写し取る(ボタン, 文) {
 function 作り直しボタン付け() {
   会話欄.querySelectorAll(".作り直す").forEach((b) => b.remove());
   const 最後 = [...会話欄.querySelectorAll(".発言")].at(-1);
-  if (!今 || 中断 || !最後 || !最後.classList.contains("assistant")) return;
+  if (!筋 || 中断 || !最後 || !最後.classList.contains("assistant")) return;
   const b = document.createElement("button");
   b.type = "button";
   b.className = "作り直す";
@@ -534,27 +606,32 @@ $("温度").addEventListener("change", 設定保存);
 $("砂場網").addEventListener("change", 設定保存);
 
 // --- 題を変える ---
+// 押すと書けるようになり、Enter かほかを押すと保存する。見出しの大きい題はスレッドの、小さい題は会話の題
 
-題欄.addEventListener("click", () => {
-  if (!今 || 題欄.isContentEditable) return;
-  題欄.contentEditable = "true";
-  題欄.focus();
-  document.getSelection().selectAllChildren(題欄);
-});
-題欄.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !変換中(e)) { e.preventDefault(); 題欄.blur(); }
-  if (e.key === "Escape") { 題欄.textContent = 今.title || "新しい会話"; 題欄.blur(); }
-});
-題欄.addEventListener("blur", async () => {
-  if (!題欄.isContentEditable) return;
-  題欄.contentEditable = "false";
-  const 題 = 題欄.textContent.trim();
-  if (今 && 題 && 題 !== 今.title) {
-    今 = await API(`conversations/${今.id}`, "PUT", { title: 題 });
-    一覧読込();
-  }
-  題欄.textContent = 今 ? (今.title || "新しい会話") : "新しい会話";
-});
+function 題を書けるようにする(el, 今の題, 保存) {
+  el.addEventListener("click", () => {
+    if (!今の題() || el.isContentEditable) return;
+    el.contentEditable = "true";
+    el.focus();
+    document.getSelection().selectAllChildren(el);
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !変換中(e)) { e.preventDefault(); el.blur(); }
+    if (e.key === "Escape") { el.textContent = 今の題(); el.blur(); }
+  });
+  el.addEventListener("blur", async () => {
+    if (!el.isContentEditable) return;
+    el.contentEditable = "false";
+    const 題 = el.textContent.trim();
+    if (題 && 題 !== 今の題()) {
+      try { await 保存(題); } catch (e) { 知らせる(`題を変えられませんでした(${e.message})`); }
+      一覧読込();
+    }
+    会話題表示();
+  });
+}
+題を書けるようにする(題欄, () => 筋 && 筋題(筋), async (題) => { 筋 = await API(`threads/${筋.id}`, "PUT", { title: 題 }); await 会話読み直す(); });
+題を書けるようにする($("会話題"), () => 今 && (今.title || "新しい会話"), async (題) => { 今 = await API(`conversations/${今.id}`, "PUT", { title: 題 }); });
 
 // --- 答えを受け取る ---
 
@@ -630,6 +707,7 @@ async function 答えてもらう() {
   if (ウェブ) { 調べ欄.textContent = "🌐 ウェブで調べています…"; el.prepend(調べ欄); }
   中断 = new AbortController();
   送受中にする(true);
+  const 番号 = 筋.id; // 答えている間にほかのスレッドを開いても、このスレッドにしまう
   const 描く = () => {
     描く予定 = false;
     const 今の題 = !待つ ? "" : 様子 || (考え && !答え ? "考えています…" : "");
@@ -652,7 +730,7 @@ async function 答えてもらう() {
   };
   let 止めた = false;
   try {
-    const 頼み = { conversation: 今.id };
+    const 頼み = { thread: 番号 };
     if (ウェブ) 頼み.web = true;
     if (砂場) 頼み.code = true;
     if (GitHub中()) 頼み.github = true;
@@ -664,10 +742,11 @@ async function 答えてもらう() {
   待つ = false;
   描く();
   el.classList.remove("待ち");
-  const 番号 = 今.id;
   if (答え) {
-    try { 今 = await API(`conversations/${番号}/messages`, "POST", { role: "assistant", content: 答え + 出典文(出典) }); }
-    catch (e) { 誤り = 誤り || `答えを保存できませんでした(${e.message})`; }
+    try {
+      const 新 = await API(`threads/${番号}/messages`, "POST", { role: "assistant", content: 答え + 出典文(出典) });
+      if (筋 && 筋.id === 番号) 筋 = 新;
+    } catch (e) { 誤り = 誤り || `答えを保存できませんでした(${e.message})`; }
     const 印 = document.createElement("span");
     印.className = "淡 小字 統計";
     if (統計 && 統計.seconds > 0) 印.textContent = `${統計.tokens} トークン · ${(統計.tokens / 統計.seconds).toFixed(1)} トークン/秒`;
@@ -679,6 +758,7 @@ async function 答えてもらう() {
   中断 = null;
   送受中にする(false);
   if (誤り) 失敗を出す(誤り, !答え);
+  await 会話読み直す();
   一覧読込();
   文欄.focus();
 }
@@ -708,25 +788,26 @@ async function 送る() {
       今 = await API("conversations", "POST", { model: モデル欄.value });
       if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
       新規倉 = [];
-      history.replaceState(null, "", `#${今.id}`);
+      筋 = await API(`threads/${今.threads[0].id}`);
+      history.replaceState(null, "", 道を作る(今.id, 筋.id));
     }
     文欄.value = "";
     文欄高さ();
-    今 = await API(`conversations/${今.id}/messages`, "POST", { role: "user", content: 質問 });
+    筋 = await API(`threads/${筋.id}/messages`, "POST", { role: "user", content: 質問 });
+    await 会話読み直す();
   } catch (e) {
     知らせる(`送れませんでした(${e.message})`);
     return;
   }
-  題欄.textContent = 今.title || "新しい会話";
-  document.title = `${今.title} - おはなし`;
+  会話題表示();
   発言を足す("user", 質問);
   一覧読込();
   await 答えてもらう();
 }
 
 async function 作り直す() {
-  if (!今 || 中断) return;
-  今 = await API(`conversations/${今.id}/last-answer`, "DELETE");
+  if (!筋 || 中断) return;
+  筋 = await API(`threads/${筋.id}/last-answer`, "DELETE");
   const 最後 = [...会話欄.querySelectorAll(".発言")].at(-1);
   if (最後 && 最後.classList.contains("assistant")) 最後.remove();
   await 答えてもらう();
@@ -756,14 +837,21 @@ $("入力欄").addEventListener("submit", (e) => { e.preventDefault(); 送る();
 });
 止めるボタン.addEventListener("click", () => { if (中断) 中断.abort(); });
 $("新規").addEventListener("click", 新規);
+$("新スレッド").addEventListener("click", 新スレッド);
 $("横欄開く").addEventListener("click", () => { document.body.classList.add("横欄開"); $("覆い").hidden = false; });
 $("横欄閉じる").addEventListener("click", 横欄閉じる);
 $("覆い").addEventListener("click", 横欄閉じる);
 $("指示").addEventListener("input", () => { if (!今) 保存する("指示", $("指示").value); });
 
+// #会話/スレッド を開く。#会話 だけなら、その会話を開いていなければ一番新しく話したスレッドを開く
 function 道から開く() {
-  const n = parseInt(location.hash.slice(1), 10);
-  if (n > 0) { if (!今 || 今.id !== n) 開く(n); } else if (今) 新規();
+  const 道 = 道を読む(location.hash);
+  if (!道) { if (今) 新規(); return; }
+  if (今 && 今.id === 道.会話 && 筋 && (道.スレッド === 0 || 筋.id === 道.スレッド)) {
+    if (道.スレッド === 0) history.replaceState(null, "", 道を作る(今.id, 筋.id));
+    return;
+  }
+  開く(道.会話, 道.スレッド);
 }
 window.addEventListener("hashchange", 道から開く);
 

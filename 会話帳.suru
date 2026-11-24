@@ -205,11 +205,11 @@ db から 番号 を 最後答え削除する とは
 m を 発言JSONにする とは
   （（「role」 と （m の 役 の JSON文字列） の JSON項目） と （「content」 と （m の 内容 の JSON文字列） の JSON項目）） の JSON物
 
-# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"network":真偽,"repos":[{"repo":…,"write":真偽}, …],"threads":[…],"messages":[…]}
-# threads は スレッド一覧取得した JSON。messages は一番新しいスレッドの発言(スレッドを知らない前の画面のため)
-会話 に JSON を 発言 の リスト で 会話JSONにする は JSON を 返す
-c に 筋群 を 発言群 で 会話JSONにする とは
-  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「network」 と （（c の 網 = 1） の JSON真偽） の JSON項目） と （「repos」 と （c の 倉 を 倉JSONにする） の JSON項目） と （「threads」 と 筋群 の JSON項目） と （「messages」 と （（発言群 の それぞれ を 発言JSONにする） の JSON配列） の JSON項目）） の JSON物
+# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"network":真偽,"repos":[{"repo":…,"write":真偽}, …],"threads":[…]}
+# threads は スレッド一覧取得した JSON。発言はスレッドの中身で読む
+会話 を JSON で 会話JSONにする は JSON を 返す
+c を 筋群 で 会話JSONにする とは
+  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「network」 と （（c の 網 = 1） の JSON真偽） の JSON項目） と （「repos」 と （c の 倉 を 倉JSONにする） の JSON項目） と （「threads」 と 筋群 の JSON項目）） の JSON物
 
 # スレッドの中身: {"id":…,"conversation":…,"title":…,"messages":[…]}
 スレッド を 発言 の リスト で スレッドJSONにする は JSON を 返す

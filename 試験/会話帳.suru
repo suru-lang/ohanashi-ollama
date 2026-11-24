@@ -57,9 +57,11 @@
 JSON試験する は 真偽 を 返す 入出力動作
 JSON試験する とは 入出力手順
   c とは 番号 は 3 で 題 は 「題」 で モデル は 「m」 で 指示 は 「」 で 温度 は -1 で 網 は 0 で 倉 は 「」 の 会話帳内の会話
-  j とは c に （空 の JSON配列） を （（役 は 「user」 で 内容 は 「a"b」 の 会話帳内の発言） を 空 に 挿入する） で 会話帳内の会話JSONにする
-  （j を JSON文字列にする） を 「{"id":3,"title":"題","model":"m","system":"","temperature":-1,"network":false,"repos":[],"threads":[],"messages":[{"role":"user","content":"a\"b"}]}」 に 一致確認する
-  k とは （倉 は 「[{"repo":"o/r","write":false}]」 の c） に （空 の JSON配列） を 空 で 会話帳内の会話JSONにする
+  j とは c を （空 の JSON配列） で 会話帳内の会話JSONにする
+  （j を JSON文字列にする） を 「{"id":3,"title":"題","model":"m","system":"","temperature":-1,"network":false,"repos":[],"threads":[]}」 に 一致確認する
+  t とは （番号 は 5 で 会話番号 は 3 で 題 は 「筋」 の 会話帳内のスレッド） を （（役 は 「user」 で 内容 は 「a"b」 の 会話帳内の発言） を 空 に 挿入する） で 会話帳内のスレッドJSONにする
+  （t を JSON文字列にする） を 「{"id":5,"conversation":3,"title":"筋","messages":[{"role":"user","content":"a\"b"}]}」 に 一致確認する
+  k とは （倉 は 「[{"repo":"o/r","write":false}]」 の c） を （空 の JSON配列） で 会話帳内の会話JSONにする
   （（k から 「repos」 を JSON取得する） を JSON文字列にする） を 「[{"repo":"o/r","write":false}]」 に 一致確認する
 
 検索試験する は 数 を 返す 入出力動作

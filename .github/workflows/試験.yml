@@ -1,4 +1,4 @@
-# kumu 試験・kumu 点検・Markdown の変換の試験と、偽の Ollama(偽の web 検索 API も)を相手にアプリ全体を Linux と macOS で動かします。
+# kumu 試験・kumu 点検・Markdown の変換と画面の道の試験と、偽の Ollama(偽の web 検索 API も)を相手にアプリ全体を Linux と macOS で動かします。
 name: 試験
 
 on:
@@ -43,8 +43,10 @@ jobs:
         run: ~/go/bin/kumu 試験
       - name: 点検
         run: ~/go/bin/kumu 点検
-      - name: Markdown の変換の試験
-        run: node 道具/書式試験.js
+      - name: Markdown の変換と、画面の道の試験
+        run: |
+          node 道具/書式試験.js
+          node 道具/道試験.js
       - name: 偽の Ollama を相手に動かす
         run: |
           ~/go/bin/kumu 作る
