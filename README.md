@@ -11,7 +11,7 @@
 - 考えるモデル(qwen3・deepseek-r1 など)の考えている途中の文は、たたんで出します
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
-- 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(Ollama の API キーが要ります)
+- 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -45,18 +45,33 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--port ポート` | 画面を開くポート | 8080 |
 | `--db ファイル` | 会話をしまう SQLite のファイル | `ohanashi.db` |
 | `--screen フォルダ` | 画面のファイルのフォルダ | `画面` |
+| `--searxng URL` | ウェブ検索に使う SearXNG | 環境変数 `SEARXNG_URL`、なければ使わない |
 | `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
 
 ### ウェブで調べる
 
-ウェブ検索には [Ollama の web 検索 API](https://docs.ollama.com/capabilities/web-search) を使います。ollama.com にサインインして [API キー](https://ollama.com/settings/keys)を作り、環境変数 `OLLAMA_API_KEY` に入れて起動します。キーがないと「🌐 ウェブ」のボタンは押せません。
+ウェブ検索には、自分で動かす [SearXNG](https://docs.searxng.org/) か、[Ollama の web 検索 API](https://docs.ollama.com/capabilities/web-search) を使います。両方あれば SearXNG を使います。どちらもないと「🌐 ウェブ」のボタンは押せません。
+
+**SearXNG**(アカウントもキーも要りません)。Docker なら次のように動かします。
 
 ```sh
-export OLLAMA_API_KEY=キー
-kumu 実行
+mkdir -p searxng
+docker run -d --name searxng -p 8888:8080 -v "$PWD/searxng:/etc/searxng" searxng/searxng
 ```
 
-調べた言葉(最後の問い)は ollama.com に送られます。ローカルの外に出したくない問いでは、ボタンを押さないでください。
+最初に起動すると `searxng/settings.yml` ができます。これを開いて、`search:` の `formats:` に `- json` を足し(足さないと JSON の要求は 403 で断られます)、`server:` の `limiter:` を `false` にしてから、`docker restart searxng` します。そのあと SearXNG の URL を渡して起動します。
+
+```sh
+SEARXNG_URL=http://localhost:8888 kumu 実行
+```
+
+**Ollama の web 検索 API**。ollama.com にサインインして [API キー](https://ollama.com/settings/keys)を作り、環境変数 `OLLAMA_API_KEY` に入れて起動します。
+
+```sh
+OLLAMA_API_KEY=キー kumu 実行
+```
+
+調べた言葉(最後の問い)は SearXNG から検索サービスへ、または ollama.com へ送られます。ローカルの外に出したくない問いでは、ボタンを押さないでください。
 
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
@@ -73,9 +88,10 @@ node 道具/書式試験.js        # 画面の Markdown の変換の試験
 suru 道具/偽Ollama.suru &                       # http://localhost:11435
 kumu 実行 -- --ollama http://localhost:11435 --db 出力/試し.db
 OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-search http://localhost:11435/api/web_search   # ウェブ検索も試す
+kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435   # SearXNG で試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -84,8 +100,8 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 | [本体.suru](本体.suru) | サーバー。道ごとの答え、WebSocket、Ollama の答えをブラウザへ流すところ |
 | [会話帳.suru](会話帳.suru) | 会話と発言を SQLite にしまう |
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
-| [ウェブ検索.suru](ウェブ検索.suru) | Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
-| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY` |
+| [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
+| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL` |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
 
 依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) です。
@@ -133,12 +149,13 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 4. **出典は答えといっしょに保存する。** 画面は `sources` を受け取ったら、答えの終わりに「出典」の番号付きの一覧(Markdown のリンク)を足して、その全体を保存します。読み込み直しても出典が残り、次の問いのときにはモデルにも見えます。
 5. **調べられなくても答える。** キーがない・違う・つながらないときは `{"notice":…}` を送って、検索なしで答えます。画面は答えの上に知らせを出します。
 6. **ボタンの状態はブラウザが覚える。** 会話ごとではなく、`localStorage` に1つだけ覚えます。
+7. **SearXNG も使える。** ollama.com につながらない・アカウントを作りたくないときのために、自分で動かす SearXNG の JSON の API(`GET /search?q=…&format=json`)も使えるようにしました。問いは UTF-8 のバイトごとに `%XX` にして送り、結果のはじめの5つを使います。結果の形(`results` の `title`・`url`・`content`)は Ollama の API と同じなので、そのあとは同じに扱います。`SEARXNG_URL` があれば、Ollama のキーより先に使います。
 
 ## 今後の候補
 
 - 外からつなげないように、127.0.0.1 だけで待ち受ける(する の「通信」に、待ち受けるアドレスを選べる関数が要ります)
 - 画面のファイルを実行ファイルに入れて、どのフォルダからでも起動できるようにする
-- ウェブ検索: 言葉をモデルに作らせる(道具の呼び出し)、ページを読む `/api/web_fetch`、ほかの検索サービス
+- ウェブ検索: 言葉をモデルに作らせる(道具の呼び出し)、ページを読む `/api/web_fetch`、SearXNG の言語・カテゴリを選ぶ
 - 会話を Markdown・JSON に書き出す
 - 画像を送る(Ollama の `images`、見えるモデル)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける

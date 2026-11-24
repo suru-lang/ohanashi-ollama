@@ -71,6 +71,15 @@ jobs:
           head -1 出力/検索答え | grep -F '{"sources":[{"title":"天気 の結果 1","url":"https://example.com/1"}'
           [ "$(grep -o '"content":"[^"]*"' 出力/検索答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: 天気 [検索あり]" ]
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c sources | grep -x 0
+          # SearXNG: 問いを URL に符号化して送り、はじめの5つを使う(偽の SearXNG は6つ返す)
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8091 --searxng http://127.0.0.1:11435/ > 出力/アプリ2.log 2>&1 &
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8091/ && break; sleep 0.2; done
+          curl -s http://127.0.0.1:8091/api/info | grep -F '"web":true'
+          curl -s -X POST -d '{"conversation":1,"web":true}' http://127.0.0.1:8091/api/chat | tee 出力/SearXNG答え
+          head -1 出力/SearXNG答え | grep -F '{"sources":[{"title":"%E5%A4%A9%E6%B0%97 の結果 1"'
+          [ "$(head -1 出力/SearXNG答え | grep -o '"url"' | wc -l | tr -d ' ')" = 5 ]
+          [ "$(grep -o '"content":"[^"]*"' 出力/SearXNG答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: 天気 [検索あり]" ]
+          kill %3
           curl -s -o /dev/null -w '%{http_code}\n' -H 'Origin: http://evil.example' $B/api/conversations | grep -x 403
           curl -s -X PUT -d '{"model":"ない"}' $B/api/conversations/1 > /dev/null
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -F "{\"error\":\"Ollama: model 'ない' not found"
