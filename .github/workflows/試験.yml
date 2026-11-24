@@ -312,6 +312,10 @@ jobs:
           curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":true}]}' $B/api/conversations/2 > /dev/null
           話す2() { curl -s -X POST -d "{\"role\":\"user\",\"content\":\"$1\"}" $B/api/conversations/2/messages > /dev/null; curl -s -X POST -d '{"conversation":2,"code":true,"github":true}' $B/api/chat; }
           話す2 'o/r を clone して' | grep -F '"summary":"🐙 o/r を /work/r に clone しました'
+          # push していないのに、枝が GitHub にあると答えたら、サーバーが GitHub の枝の一覧で確かめて、ないと知らせて頼み直す
+          話す2 '枝があると言って' | tee 出力/git答え10
+          grep -F '"notice":"⚠ 答えにある枝 ohanashi/nothere は GitHub にありません(サーバーが確かめました)。' 出力/git答え10
+          grep -F '"content":"枝がないと言われました"' 出力/git答え10
           printf '3行目\n' >> 出力/作業G/2/r/README.md
           話す2 '押し直しを試して' | tee 出力/git答え9
           grep -F '"summary":"🐙 書けませんでした: 既定の枝(main)には push しません。' 出力/git答え9
