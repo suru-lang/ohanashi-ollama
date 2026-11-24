@@ -202,6 +202,12 @@ textarea {
   line-height: 1.5;
 }
 
+/* ウェブで調べるかどうかの切り替え。押してある間は色を付ける */
+button.切替 { white-space: nowrap; }
+button.切替[aria-pressed="true"] { background: var(--主); color: var(--主字); border-color: var(--主); }
+button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
+.調べ { font-size: 0.8rem; color: var(--淡); margin-bottom: 4px; }
+
 /* --- 狭い画面: 一覧は ☰ で出す --- */
 .携帯のみ { display: none; }
 #覆い { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 5; }
@@ -211,6 +217,7 @@ textarea {
   body.横欄開 #横欄 { transform: none; }
   .発言, .発言.assistant, .失敗 { max-width: 100%; width: auto; }
   .発言.assistant { width: 100%; }
+  button.切替 .字 { display: none; }
   .道具 button { opacity: 1; }
   .項目 .消す { visibility: visible; }
   select { max-width: 45%; }

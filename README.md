@@ -11,6 +11,7 @@
 - 考えるモデル(qwen3・deepseek-r1 など)の考えている途中の文は、たたんで出します
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
+- 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(Ollama の API キーが要ります)
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -19,7 +20,9 @@
 
 - [Ollama](https://ollama.com/download) と、モデルを1つ以上(`ollama pull llama3.2` など)
 - する 本体 0.3.0 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
-- libsqlite3(`kumu` が足りなければ入れ方を出します。macOS: `brew install sqlite` と `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig"`、Debian・Ubuntu: `sudo apt install libsqlite3-dev`)
+- libsqlite3 と OpenSSL(`kumu` が足りなければ入れ方を出します)
+  - macOS: `brew install sqlite openssl@3` と `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
+  - Debian・Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
 
 ```sh
 git clone https://github.com/suru-lang/ohanashi-ollama
@@ -42,13 +45,25 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--port ポート` | 画面を開くポート | 8080 |
 | `--db ファイル` | 会話をしまう SQLite のファイル | `ohanashi.db` |
 | `--screen フォルダ` | 画面のファイルのフォルダ | `画面` |
+| `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
+
+### ウェブで調べる
+
+ウェブ検索には [Ollama の web 検索 API](https://docs.ollama.com/capabilities/web-search) を使います。ollama.com にサインインして [API キー](https://ollama.com/settings/keys)を作り、環境変数 `OLLAMA_API_KEY` に入れて起動します。キーがないと「🌐 ウェブ」のボタンは押せません。
+
+```sh
+export OLLAMA_API_KEY=キー
+kumu 実行
+```
+
+調べた言葉(最後の問い)は ollama.com に送られます。ローカルの外に出したくない問いでは、ボタンを押さないでください。
 
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
 ## 試験
 
 ```sh
-kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・引数の試験
+kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数の試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
 ```
 
@@ -57,9 +72,10 @@ node 道具/書式試験.js        # 画面の Markdown の変換の試験
 ```sh
 suru 道具/偽Ollama.suru &                       # http://localhost:11435
 kumu 実行 -- --ollama http://localhost:11435 --db 出力/試し.db
+OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-search http://localhost:11435/api/web_search   # ウェブ検索も試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -68,16 +84,17 @@ kumu 実行 -- --ollama http://localhost:11435 --db 出力/試し.db
 | [本体.suru](本体.suru) | サーバー。道ごとの答え、WebSocket、Ollama の答えをブラウザへ流すところ |
 | [会話帳.suru](会話帳.suru) | 会話と発言を SQLite にしまう |
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
-| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST` |
+| [ウェブ検索.suru](ウェブ検索.suru) | Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
+| [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY` |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
 
-依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP クライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) です。
+依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) です。
 
 ### サーバーの道
 
 | 道 | 答え |
 |---|---|
-| `GET /api/info` | Ollama の場所と版 |
+| `GET /api/info` | Ollama の場所と版、ウェブ検索を使えるか `{"ollama":…,"version":…,"web":真偽}` |
 | `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
 | `GET /api/conversations` | 会話の一覧(新しく話した順) |
 | `POST /api/search` | 題か発言に言葉を含む会話 `{"q":…}` → `[{"id":…,"title":…,"snippet":…}, …]` |
@@ -85,10 +102,10 @@ kumu 実行 -- --ollama http://localhost:11435 --db 出力/試し.db
 | `GET・PUT・DELETE /api/conversations/番号` | 会話の中身を読む・題とモデルと指示と温度を変える・消す |
 | `POST /api/conversations/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
 | `DELETE /api/conversations/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す |
+| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
-流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。WebSocket では最後に `{"done":true}` を送ります。
+流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。WebSocket では最後に `{"done":true}` を送ります。
 
 ## 決めたこと
 
@@ -108,11 +125,20 @@ kumu 実行 -- --ollama http://localhost:11435 --db 出力/試し.db
 3. **変換を確定する Enter では送らない。** Chrome は確定の Enter に `isComposing` を付けますが、Safari は先に `compositionend` を出してから `isComposing` のない keydown を出します。`isComposing`・keyCode 229・`compositionend` から 150 ミリ秒の間の Enter は、確定とみなして送りません(macOS の Safari と ATOK で、確定の Enter で送られてしまったため)。
 4. **止めるときは WebSocket を閉じる。** サーバーは次に送るところで失敗して、Ollama への接続も閉じます(Ollama も答えを作るのをやめます)。次に送るときにつなぎ直します。
 
+### ウェブ検索
+
+1. **Ollama の web 検索 API を使う。** 検索のサービスは、Ollama を使う人が一番キーを用意しやすいものにしました。`POST https://ollama.com/api/web_search` に `Authorization: Bearer キー` を付けて `{"query":…,"max_results":5}` を送ります。http ライブラリの HTTPS(OpenSSL)で、証明書と名前を確かめてつなぎます。
+2. **調べるのは最後の問いそのまま。** モデルに検索の言葉を作らせる(道具の呼び出し)と、道具を使えるモデルでしか動かず、1回の答えに2回モデルを動かすので、まずは問いをそのまま送ります。
+3. **結果は問いのすぐ前に指示(system)として渡す。** 「[1] 題・URL・中身(1500 文字まで)」を並べ、番号で出典を示すように頼みます。この指示は保存しないので、次の問いのときには渡しません(そのときボタンが押してあれば、また調べます)。
+4. **出典は答えといっしょに保存する。** 画面は `sources` を受け取ったら、答えの終わりに「出典」の番号付きの一覧(Markdown のリンク)を足して、その全体を保存します。読み込み直しても出典が残り、次の問いのときにはモデルにも見えます。
+5. **調べられなくても答える。** キーがない・違う・つながらないときは `{"notice":…}` を送って、検索なしで答えます。画面は答えの上に知らせを出します。
+6. **ボタンの状態はブラウザが覚える。** 会話ごとではなく、`localStorage` に1つだけ覚えます。
+
 ## 今後の候補
 
 - 外からつなげないように、127.0.0.1 だけで待ち受ける(する の「通信」に、待ち受けるアドレスを選べる関数が要ります)
 - 画面のファイルを実行ファイルに入れて、どのフォルダからでも起動できるようにする
-- インターネットで検索して答える(http ライブラリの HTTPS ができてから)
+- ウェブ検索: 言葉をモデルに作らせる(道具の呼び出し)、ページを読む `/api/web_fetch`、ほかの検索サービス
 - 会話を Markdown・JSON に書き出す
 - 画像を送る(Ollama の `images`、見えるモデル)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける

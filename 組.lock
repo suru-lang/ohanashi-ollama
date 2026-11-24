@@ -1,3 +1,3 @@
 # kumu が書いたファイルです。手で書きかえないでください(名前・場所・版・コミット・中身のハッシュ)
-HTTP	github.com/suru-lang/http	0.3.0	33e4aaad2ec764e500ce15871a9f8245c33f3518	sha256-334903dd7e0ec605c22c9e30ca5847d49c9c9103ff0406b3e985b0cd3dc6d04d
+HTTP	github.com/suru-lang/http	0.4.0	9da24a1ad15bee031a1a0e242d1f1c1ea64ae437	sha256-02e8a4dbdd47c2935ef6d4b269ff660de448fe74f7be4211ba8df44353d44549
 SQLite	github.com/suru-lang/sqlite	0.1.0	a37c5d826c6e986b7e61e79c5b92de7e588ac54c	sha256-6400941645209dbd21676797f2e0d1ee85eb823aa1847d0d67440c953ce76485

@@ -1,6 +1,8 @@
 // おはなし の画面。会話はサーバーが SQLite にしまい、画面は送る前と答えの後に発言を保存します。
 // 答えは WebSocket(ws)で受け取ります。{"conversation":番号} を送ると、1つずつの JSON
 // ({"content"}・{"thinking"}・{"stats"}・{"error"})が届き、最後に {"done":true} が届きます。
+// {"web":true} も送ると、サーバーが先にウェブで調べて {"sources":[…]}(できなければ {"notice":…})を送ります。
+// 出典は答えの終わりに Markdown の番号付きの一覧として足して、答えといっしょに保存します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
 
 const $ = (id) => document.getElementById(id);
@@ -10,6 +12,7 @@ const 送るボタン = $("送る");
 const 止めるボタン = $("止める");
 const モデル欄 = $("モデル");
 const 題欄 = $("題");
+const ウェブボタン = $("ウェブ");
 
 let 今 = null;          // 開いている会話 {id, title, model, system, temperature, messages}
 let 中断 = null;        // 答えを受け取っている間の AbortController
@@ -268,6 +271,26 @@ function 表示し直す() {
 
 function 下へ() { 会話欄.scrollTop = 会話欄.scrollHeight; }
 
+// --- ウェブで調べる ---
+
+function ウェブ中() { return !ウェブボタン.disabled && ウェブボタン.getAttribute("aria-pressed") === "true"; }
+function ウェブ切替(押す) {
+  ウェブボタン.setAttribute("aria-pressed", String(押す));
+  保存する("ウェブ", 押す ? "1" : "");
+}
+ウェブボタン.addEventListener("click", () => ウェブ切替(!ウェブ中()));
+
+// 出典を答えの終わりに足す Markdown。題の [ ] と URL の ( ) は、リンクの書き方を壊さないように替える
+function 出典文(群) {
+  if (!群.length) return "";
+  const 行 = 群.map((x, i) => {
+    const 題 = (x.title || x.url || "").replace(/[\[\]]/g, (c) => (c === "[" ? "［" : "］")).replace(/\s+/g, " ");
+    const 宛 = (x.url || "").replace(/\(/g, "%28").replace(/\)/g, "%29").replace(/\s/g, "%20");
+    return /^https?:\/\//.test(宛) ? `${i + 1}. [${題}](${宛})` : `${i + 1}. ${題}`;
+  });
+  return "\n\n**出典**\n\n" + 行.join("\n");
+}
+
 // --- 発言の表示 ---
 
 function 発言を足す(役, 内容) {
@@ -440,12 +463,16 @@ async function 答えてもらう() {
   const 考え欄 = document.createElement("details");
   考え欄.className = "考え";
   考え欄.innerHTML = "<summary>考えています…</summary><div class=\"考え文\"></div>";
-  let 答え = "", 考え = "", 誤り = "", 統計 = null, 描く予定 = false;
+  let 答え = "", 考え = "", 誤り = "", 統計 = null, 描く予定 = false, 出典 = [];
+  const ウェブ = ウェブ中();
+  const 調べ欄 = document.createElement("div");
+  調べ欄.className = "調べ";
+  if (ウェブ) { 調べ欄.textContent = "🌐 ウェブで調べています…"; el.prepend(調べ欄); }
   中断 = new AbortController();
   送受中にする(true);
   const 描く = () => {
     描く予定 = false;
-    中身を書く(el, 答え);
+    中身を書く(el, 答え + 出典文(出典));
     if (考え) {
       if (!考え欄.isConnected) el.prepend(考え欄);
       考え欄.querySelector(".考え文").textContent = 考え;
@@ -459,11 +486,13 @@ async function 答えてもらう() {
     if (通知.thinking) 考え += 通知.thinking;
     if (通知.error) 誤り = 通知.error;
     if (通知.stats) 統計 = 通知.stats;
+    if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
+    if (通知.notice) 調べ欄.textContent = `🌐 ${通知.notice}`;
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
   };
   let 止めた = false;
   try {
-    await 聞く(JSON.stringify({ conversation: 今.id }), 受け取る, 中断.signal);
+    await 聞く(JSON.stringify(ウェブ ? { conversation: 今.id, web: true } : { conversation: 今.id }), 受け取る, 中断.signal);
   } catch (e) {
     if (e.name === "AbortError") 止めた = true;
     else 誤り = String(e.message || e);
@@ -472,7 +501,7 @@ async function 答えてもらう() {
   el.classList.remove("待ち");
   const 番号 = 今.id;
   if (答え) {
-    try { 今 = await API(`conversations/${番号}/messages`, "POST", { role: "assistant", content: 答え }); }
+    try { 今 = await API(`conversations/${番号}/messages`, "POST", { role: "assistant", content: 答え + 出典文(出典) }); }
     catch (e) { 誤り = 誤り || `答えを保存できませんでした(${e.message})`; }
     const 印 = document.createElement("span");
     印.className = "淡 小字 統計";
@@ -577,6 +606,11 @@ window.addEventListener("hashchange", 道から開く);
 (async () => {
   API("info").then((i) => {
     $("接続先").textContent = i.version ? `Ollama ${i.version} · ${i.ollama}` : `${i.ollama}(つながっていません)`;
+    if (i.web) {
+      ウェブボタン.disabled = false;
+      ウェブボタン.title = "押してあると、ウェブで調べてから答えます";
+      ウェブ切替(保存値("ウェブ", "") === "1");
+    }
   }).catch(() => {});
   await モデル読込();
   if (location.hash) 道から開く();

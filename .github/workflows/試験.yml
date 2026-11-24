@@ -1,4 +1,4 @@
-# kumu 試験・kumu 点検・Markdown の変換の試験と、偽の Ollama を相手にアプリ全体を Linux と macOS で動かします。
+# kumu 試験・kumu 点検・Markdown の変換の試験と、偽の Ollama(偽の web 検索 API も)を相手にアプリ全体を Linux と macOS で動かします。
 name: 試験
 
 on:
@@ -24,14 +24,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: clang と libsqlite3 を入れる(Linux)
+      - name: clang と libsqlite3 と OpenSSL を入れる(Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang libsqlite3-dev
-      - name: libsqlite3 の pkg-config を探せるようにする(macOS)
+        run: sudo apt-get update && sudo apt-get install -y clang libsqlite3-dev libssl-dev
+      - name: libsqlite3 と OpenSSL の pkg-config を探せるようにする(macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install sqlite
-          echo "PKG_CONFIG_PATH=$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
+          brew install sqlite openssl@3
+          echo "PKG_CONFIG_PATH=$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: kumu と suruc を入れる
         # @main は Go のモジュールのプロキシが少し前の main を覚えていることがあるので、GitHub から直接取る
         env:
@@ -50,11 +50,11 @@ jobs:
           ~/go/bin/kumu 作る
           ~/go/bin/suruc 道具/偽Ollama.suru -o 出力/偽Ollama
           ./出力/偽Ollama 11435 > 出力/偽Ollama.log 2>&1 &
-          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8090 > 出力/アプリ.log 2>&1 &
+          OLLAMA_API_KEY=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8090 --web-search http://127.0.0.1:11435/api/web_search > 出力/アプリ.log 2>&1 &
           for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8090/ && break; sleep 0.2; done
           B=http://127.0.0.1:8090
           curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $B/ | grep -x '200 text/html; charset=utf-8'
-          curl -s $B/api/info | grep -F '"version":"0.0.0-偽"'
+          curl -s $B/api/info | grep -F '"version":"0.0.0-偽","web":true'
           curl -s $B/api/models | grep -F '{"models":["偽","偽-考える"]}'
           curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"id":1'
           curl -s -X POST -d '{"role":"user","content":"やあ"}' $B/api/conversations/1/messages | grep -F '"title":"やあ"'
@@ -65,6 +65,12 @@ jobs:
           curl -s $B/api/conversations | grep -F '"title":"やあ"'
           curl -s -X POST -d '{"q":"やあ"}' $B/api/search | grep -F '"snippet":"やあ"'
           curl -s -X POST -d '{"q":"ない言葉"}' $B/api/search | grep -x '\[\]'
+          # ウェブ検索: 先に出典が届き、モデルには検索の結果が渡る(偽の Ollama は「 [検索あり]」を付ける)
+          curl -s -X POST -d '{"role":"user","content":"天気"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"web":true}' $B/api/chat | tee 出力/検索答え
+          head -1 出力/検索答え | grep -F '{"sources":[{"title":"天気 の結果 1","url":"https://example.com/1"}'
+          [ "$(grep -o '"content":"[^"]*"' 出力/検索答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: 天気 [検索あり]" ]
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c sources | grep -x 0
           curl -s -o /dev/null -w '%{http_code}\n' -H 'Origin: http://evil.example' $B/api/conversations | grep -x 403
           curl -s -X PUT -d '{"model":"ない"}' $B/api/conversations/1 > /dev/null
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -F "{\"error\":\"Ollama: model 'ない' not found"
