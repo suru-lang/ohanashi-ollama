@@ -389,8 +389,18 @@ $("倉名").addEventListener("keydown", (e) => { if (e.key === "Enter" && !変�
 
 const 拡張子言語 = { py: "python", js: "javascript", ts: "typescript", sh: "sh", rb: "ruby", go: "go", rs: "rust", c: "c", h: "c", cpp: "cpp", java: "java", html: "html", css: "css", json: "json", md: "markdown", yml: "yaml", yaml: "yaml", toml: "toml", sql: "sql", suru: "suru" };
 
-// 道具を使った跡を Markdown にする。中身に ``` があっても壊れないように ~~~~ で囲む
+// 道具を使った跡を Markdown にする。中身に ``` があっても壊れないように ~~~~ で囲み、後に道具の印の行を足す
 function 道具文(t) {
+  return 道具跡文(t) + `${道具印}${t.name || "?"}\n\n`;
+}
+
+// モデルの文の ``` が閉じていなければ閉じる(道具の跡がコードの中に入らないように)
+function 柵閉じ(文) {
+  const 数 = 文.split("\n").filter((行) => /^\s*```/.test(行)).length;
+  return 数 % 2 ? 文 + "\n```" : 文;
+}
+
+function 道具跡文(t) {
   const 囲 = "~~~~";
   if (t.name === "run") {
     const 出 = (t.output || "").replace(/\n$/, "");
@@ -463,7 +473,8 @@ function 中身を書く(el, 内容, 様子 = {}) {
   if (途中文.dataset.内容 !== 分.途中) { 途中文.dataset.内容 = 分.途中; 途中文.innerHTML = 書式化(分.途中); }
   const 題 = [];
   if (考え) 題.push("考えたこと");
-  if (分.手順) 題.push(`道具 ${分.手順} 回`);
+  if (分.道具群) 題.push(`道具: ${分.道具群.join("・")}`);
+  else if (分.手順) 題.push(`道具 ${分.手順} 回`);
   欄.querySelector("summary").textContent = 様子.今 || (分.途中 ? `途中経過(${題.join("・")})` : "考えたこと");
 }
 
@@ -627,14 +638,15 @@ async function 答えてもらう() {
     if (近い) 下へ();
   };
   const 受け取る = (通知) => {
-    if (通知.content) { 答え += 通知.content; 様子 = ""; }
-    if (通知.thinking) 考え += 通知.thinking;
+    // モデルの文から道具の印の字を除く(道具を使っていないのに、使ったように見えないように)
+    if (通知.content) { 答え += 通知.content.replace(/\u2063/g, ""); 様子 = ""; }
+    if (通知.thinking) 考え += 通知.thinking.replace(/\u2063/g, "");
     if (通知.error) 誤り = 通知.error;
     if (通知.stats) 統計 = 通知.stats;
     if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
     if (通知.notice) 調べ欄.textContent = `${通知.notice}`;
     if (通知.running) 様子 = 通知.running.startsWith("🐙") ? 通知.running : `💻 動かしています: ${通知.running}`;
-    if (通知.tool) { 答え += 道具文(通知.tool); 様子 = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
+    if (通知.tool) { 答え = 柵閉じ(答え) + 道具文(通知.tool); 様子 = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
     if (!調べ欄.isConnected && 通知.notice) el.prepend(調べ欄);
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
   };
