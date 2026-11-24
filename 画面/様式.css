@@ -86,6 +86,10 @@ button:disabled { opacity: 0.5; cursor: default; }
 .項目 .消す { visibility: hidden; border: none; background: none; padding: 4px 8px; font-size: 0.85rem; }
 .項目:hover .消す, .項目 .消す.確認, .項目.今 .消す { visibility: visible; }
 .消す.確認 { color: var(--誤); font-weight: 700; }
+#検索 { padding: 6px 10px; border: 1px solid var(--線); border-radius: 10px; background: var(--面); }
+.抜粋 { color: var(--淡); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
+.見つからない { margin: 8px; }
+mark { background: color-mix(in srgb, var(--差) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 #接続先 { font-size: 0.75rem; overflow-wrap: anywhere; }
 
 /* --- 本面 --- */
