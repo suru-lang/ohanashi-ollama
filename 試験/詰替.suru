@@ -1,0 +1,16 @@
+「試験」 を 読み込んで 使う
+「標準」 を 読み込んで 使う
+「JSON」 を 読み込んで 使う
+「Ollama」 を 読み込んで 使う
+「ohanashi-ollama/会話帳」 を 読み込む
+「ohanashi-ollama/詰替」 を 読み込む
+
+本文試験する は 真偽 を 返す 入出力動作
+本文試験する とは 入出力手順
+  群 とは （役 は 「user」 で 内容 は 「やあ」 の 会話帳内の発言） を 空 に 挿入する
+  c とは 番号 は 1 で 題 は 「t」 で モデル は 「llama3.2」 で 指示 は 「」 で 温度 は -1 で 網 は 0 で 倉 は 「」 で メモ は 「」 の 会話帳内の会話
+  （（c に （c で 群 を 詰替内の送る発言群にする） を 空 で 詰替内の送る依頼にする） を 真 で Ollama要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"user","content":"やあ"}],"stream":true}」 に 一致確認する
+  d とは 指示 は 「短く」 で 温度 は 0.5 の c
+  （（d に （d で 群 を 詰替内の送る発言群にする） を 空 で 詰替内の送る依頼にする） を 真 で Ollama要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"system","content":"短く"},{"role":"user","content":"やあ"}],"stream":true,"options":{"temperature":0.5}}」 に 一致確認する
+  道具 とは 「run」 で 「動かす」 を JSON無 から Ollama道具定義にする
+  （（c に 空 を （道具 を 空 に 挿入する） で 詰替内の送る依頼にする） を 真 で Ollama要求本文にする） を 「{"model":"llama3.2","messages":[],"stream":true,"tools":[{"type":"function","function":{"name":"run","description":"動かす","parameters":null}}]}」 に 一致確認する

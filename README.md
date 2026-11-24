@@ -237,7 +237,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 |---|---|
 | [本体.suru](本体.suru) | サーバー。道ごとの答え、WebSocket、Ollama の答えをブラウザへ流すところ |
 | [会話帳.suru](会話帳.suru) | 会話とスレッドと発言を SQLite にしまう |
-| [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
+| [詰替.suru](詰替.suru) | 会話帳の会話と発言を、Ollama のライブラリの発言と依頼にする |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
 | [規則.suru](規則.suru) | 会話に付けた決まりと、作業フォルダのリポジトリの決まりのファイル(`OHANASHI.md` など)を、モデルに渡す1つの指示にまとめる |
@@ -247,7 +247,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道) |
 
-依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)です。
+依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)と [suru-lang/ollama](https://github.com/suru-lang/ollama)(Ollama の API)です。
 
 ### サーバーの道
 
@@ -382,6 +382,13 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 
 1. **既定は 127.0.0.1。** 会話の記録を持つので、何もしなければ同じ機械の中からだけ開けるようにしました(suru-lang/suru#117)。前は する が 0.0.0.0 でしか待ち受けられず、ファイアウォールで閉じるしかありませんでした。
 2. **`--listen` で選ぶ。** `--listen 0.0.0.0` で、ほかの機械からも開けます。IPv6 なら `--listen ::1` のように書けます。HTTP ライブラリ 0.5.0 の `「アドレス:ポート」 を … で WebSocket内の待受する` に渡します。
+
+### Ollama のライブラリ
+
+1. **API は suru-lang/ollama で。** Ollama とのやりとり(`/api/chat` を流す・届いた行を断片・考え・道具呼出・完了・誤りに分ける、`/api/tags`・`/api/version`、web 検索 API)は、ほかのアプリでも使えるように [suru-lang/ollama](https://github.com/suru-lang/ollama) に分けました(#31)。`Ollama.suru` はなくなり、このアプリには会話帳の型から詰め替える [詰替.suru](詰替.suru) だけを置きます。
+2. **送る発言はライブラリの型で持つ。** 答えの途中で足す発言(道具を呼んだ assistant の発言、道具の結果、頼み直し、読み直したリポジトリの決まり)も、JSON でなく `Ollama発言` で作ります。
+3. **道具を回すのはこのアプリで。** 道具の回数の上限、画面への `{"running"}`・`{"tool"}`、頼み直しは、砂場と画面に絡むので、ライブラリには入れずに `本体.suru` に残しました。
+4. **失敗の文はライブラリのもの。** Ollama が `{"error":…}` を返したときの「Ollama: model 'x' not found」、つながらないときの「…/api/chat に聞けませんでした: …」は、前と同じ文です。モデルの一覧を取れなかったときの 502 の文は、ライブラリの文をそのまま使います。web 検索の鍵が違うときは「Ollama に断られました(401: …)。鍵を確かめてください」になりました。
 
 ## 今後の候補
 
