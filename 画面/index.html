@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>おはなし</title>
+<link rel="icon" href="するぞう.svg" type="image/svg+xml">
+<link rel="stylesheet" href="様式.css">
+</head>
+<body>
+<aside id="横欄">
+  <div class="横欄頭">
+    <img src="するぞう.svg" alt="" class="印">
+    <span class="名">おはなし</span>
+    <button id="横欄閉じる" type="button" class="小 携帯のみ" aria-label="一覧を閉じる">✕</button>
+  </div>
+  <button id="新規" type="button" class="主">＋ 新しい会話</button>
+  <nav id="一覧" aria-label="会話の一覧"></nav>
+  <div id="接続先" class="淡"></div>
+</aside>
+<div id="覆い" hidden></div>
+<div id="本面">
+  <header>
+    <button id="横欄開く" type="button" class="小 携帯のみ" aria-label="会話の一覧">☰</button>
+    <h1 id="題" title="クリックで題を変えます">新しい会話</h1>
+    <select id="モデル" aria-label="モデル"></select>
+    <button id="設定開く" type="button" class="小" aria-label="設定" aria-expanded="false">⚙</button>
+  </header>
+  <section id="設定欄" hidden>
+    <label>指示(システムプロンプト)
+      <textarea id="指示" rows="3" placeholder="例: 日本語で、短く答えてください。"></textarea>
+    </label>
+    <div class="行">
+      <label class="並び"><input id="温度既定" type="checkbox" checked> 温度はモデルの既定</label>
+      <label class="並び">温度 <input id="温度" type="range" min="0" max="2" step="0.1" value="0.8" disabled> <output id="温度値">0.8</output></label>
+    </div>
+    <p class="淡 小字">設定は会話ごとにしまいます。次に送るときから使います。</p>
+  </section>
+  <div id="知らせ" hidden></div>
+  <main id="会話" aria-live="polite">
+    <div id="ようこそ">
+      <img src="するぞう.svg" alt="" class="大印">
+      <p>ローカルの Ollama とおしゃべりします。<br>下の欄に書いて Enter で送ります(Shift+Enter で改行)。</p>
+    </div>
+  </main>
+  <form id="入力欄">
+    <textarea id="文" rows="1" placeholder="メッセージを書く" autofocus></textarea>
+    <button id="送る" type="submit" class="主">送る</button>
+    <button id="止める" type="button" hidden>止める</button>
+  </form>
+</div>
+<script src="書式.js"></script>
+<script src="動き.js"></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+# kumu 試験・kumu 点検・Markdown の変換の試験と、偽の Ollama を相手にアプリ全体を Linux と macOS で動かします。
+name: 試験
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: clang と libsqlite3 を入れる(Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang libsqlite3-dev
+      - name: libsqlite3 の pkg-config を探せるようにする(macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install sqlite
+          echo "PKG_CONFIG_PATH=$(brew --prefix sqlite)/lib/pkgconfig" >> "$GITHUB_ENV"
+      - name: kumu と suruc を入れる
+        # @main は Go のモジュールのプロキシが少し前の main を覚えていることがあるので、GitHub から直接取る
+        env:
+          GOPROXY: direct
+        run: |
+          go install github.com/suru-lang/suru/cmd/kumu@main
+          go install github.com/suru-lang/suru/cmd/suruc@main
+      - name: 試験
+        run: ~/go/bin/kumu 試験
+      - name: 点検
+        run: ~/go/bin/kumu 点検
+      - name: Markdown の変換の試験
+        run: node 道具/書式試験.js
+      - name: 偽の Ollama を相手に動かす
+        run: |
+          ~/go/bin/kumu 作る
+          ~/go/bin/suruc 道具/偽Ollama.suru -o 出力/偽Ollama
+          ./出力/偽Ollama 11435 > 出力/偽Ollama.log 2>&1 &
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8090 > 出力/アプリ.log 2>&1 &
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8090/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8090
+          curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $B/ | grep -x '200 text/html; charset=utf-8'
+          curl -s $B/api/info | grep -F '"version":"0.0.0-偽"'
+          curl -s $B/api/models | grep -F '{"models":["偽","偽-考える"]}'
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"id":1'
+          curl -s -X POST -d '{"role":"user","content":"やあ"}' $B/api/conversations/1/messages | grep -F '"title":"やあ"'
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | tee 出力/答え
+          grep -F '{"stats":{"tokens":12,"seconds":0.5}}' 出力/答え
+          [ "$(grep -o '"content":"[^"]*"' 出力/答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: やあ" ]
+          curl -s -X POST -d '{"role":"assistant","content":"おうむ返し: やあ"}' $B/api/conversations/1/messages | grep -F '{"role":"assistant","content":"おうむ返し: やあ"}'
+          curl -s $B/api/conversations | grep -F '"title":"やあ"'
+          curl -s -o /dev/null -w '%{http_code}\n' -H 'Origin: http://evil.example' $B/api/conversations | grep -x 403
+          curl -s -X PUT -d '{"model":"ない"}' $B/api/conversations/1 > /dev/null
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -F "{\"error\":\"Ollama: model 'ない' not found"
+          node -e '
+            const ws = new WebSocket("ws://127.0.0.1:8090/ws"); const got = [];
+            const t = setTimeout(() => { console.error("時間切れ", got); process.exit(1); }, 10000);
+            const 開いた = new Promise((r) => (ws.onopen = r));
+            const 変えた = fetch("http://127.0.0.1:8090/api/conversations/1", { method: "PUT", body: JSON.stringify({ model: "偽-考える" }) });
+            Promise.all([開いた, 変えた]).then(() => ws.send(JSON.stringify({ conversation: 1 })));
+            ws.onmessage = (e) => { got.push(JSON.parse(e.data)); if (got.at(-1).done) ws.close(); };
+            ws.onclose = () => {
+              clearTimeout(t);
+              const 答え = got.map((g) => g.content || "").join(""), 考え = got.map((g) => g.thinking || "").join("");
+              console.log(答え, 考え);
+              process.exit(答え.startsWith("おうむ返し: ") && 考え === "ふむふむ" ? 0 : 1);
+            };'
+          curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
+          kill %1 %2
+      - name: 記録を出す(失敗したとき)
+        if: failure()
+        run: cat 出力/*.log || true

@@ -1,0 +1,213 @@
+:root {
+  --地: #f6f5f2;
+  --面: #ffffff;
+  --横: #eeece6;
+  --字: #1f1f1f;
+  --淡: #6b6b6b;
+  --線: #dcd9d2;
+  --主: #1d2c4e;
+  --主字: #ffffff;
+  --自分: #2e4473;
+  --自分字: #ffffff;
+  --差: #ff4f9a;
+  --誤: #b3261e;
+  --コード地: #f0eee9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --地: #18181b;
+    --面: #232327;
+    --横: #1f1f23;
+    --字: #ececec;
+    --淡: #a0a0a0;
+    --線: #3a3a40;
+    --主: #5eeaff;
+    --主字: #10131a;
+    --自分: #34508a;
+    --自分字: #ffffff;
+    --誤: #f2b8b5;
+    --コード地: #2c2c31;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  background: var(--地);
+  color: var(--字);
+  font-family: system-ui, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  line-height: 1.7;
+  overflow: hidden;
+}
+button, select, textarea, input { font: inherit; color: inherit; }
+button {
+  padding: 6px 14px;
+  border: 1px solid var(--線);
+  border-radius: 10px;
+  background: var(--面);
+  cursor: pointer;
+}
+button:hover { border-color: var(--淡); }
+button.主 { background: var(--主); color: var(--主字); border-color: var(--主); }
+button.小 { padding: 4px 10px; }
+button:disabled { opacity: 0.5; cursor: default; }
+.淡 { color: var(--淡); }
+.小字 { font-size: 0.8rem; }
+
+/* --- 横の欄(会話の一覧) --- */
+#横欄 {
+  width: 270px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--横);
+  border-right: 1px solid var(--線);
+}
+.横欄頭 { display: flex; align-items: center; gap: 8px; }
+.横欄頭 .名 { font-weight: 700; flex: 1; }
+.印 { width: 30px; height: 30px; }
+#一覧 { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -4px; }
+.項目 { display: flex; align-items: center; border-radius: 8px; }
+.項目:hover, .項目.今 { background: var(--面); }
+.項目 a {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+  color: inherit;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.項目題 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.項目 .消す { visibility: hidden; border: none; background: none; padding: 4px 8px; font-size: 0.85rem; }
+.項目:hover .消す, .項目 .消す.確認, .項目.今 .消す { visibility: visible; }
+.消す.確認 { color: var(--誤); font-weight: 700; }
+#接続先 { font-size: 0.75rem; overflow-wrap: anywhere; }
+
+/* --- 本面 --- */
+#本面 { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--線);
+  background: var(--面);
+}
+h1 {
+  font-size: 1.05rem;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+h1[contenteditable="true"] { outline: 2px solid var(--自分); white-space: normal; }
+select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); }
+#設定欄 {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--線);
+  background: var(--面);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#設定欄 label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+#設定欄 label.並び { flex-direction: row; align-items: center; gap: 6px; }
+#設定欄 .行 { display: flex; flex-wrap: wrap; gap: 16px; }
+#設定欄 p { margin: 0; }
+#知らせ { padding: 8px 16px; font-size: 0.9rem; }
+#知らせ.誤り { background: color-mix(in srgb, var(--誤) 12%, var(--面)); color: var(--誤); }
+
+#会話 {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px max(16px, calc((100% - 820px) / 2));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+#ようこそ { margin: auto; text-align: center; color: var(--淡); }
+.大印 { width: 120px; height: 120px; }
+.発言 { max-width: 88%; overflow-wrap: anywhere; }
+.発言 .本文 { padding: 10px 14px; border-radius: 14px; }
+.発言.user { align-self: flex-end; }
+.発言.user .本文 { background: var(--自分); color: var(--自分字); white-space: pre-wrap; }
+.発言.assistant { align-self: flex-start; width: 88%; }
+.発言.assistant .本文 { background: var(--面); border: 1px solid var(--線); }
+.発言.assistant.待ち .本文:empty::after, .発言.assistant.待ち .本文 > :last-child::after { content: "▍"; animation: 点滅 1s steps(1) infinite; }
+@keyframes 点滅 { 50% { opacity: 0; } }
+.道具 { display: flex; gap: 6px; align-items: center; margin-top: 4px; min-height: 26px; }
+.発言.user .道具 { justify-content: flex-end; }
+.道具 button { padding: 1px 8px; font-size: 0.75rem; border-radius: 8px; opacity: 0; transition: opacity 0.15s; }
+.発言:hover .道具 button, .道具 button:focus, .道具 .作り直す { opacity: 1; }
+.発言.待ち .道具 { visibility: hidden; }
+.失敗 { align-self: flex-start; color: var(--誤); border: 1px solid var(--誤); border-radius: 14px; padding: 8px 14px; max-width: 88%; overflow-wrap: anywhere; }
+.失敗 button { margin-left: 8px; padding: 2px 10px; }
+
+.考え { margin-bottom: 6px; font-size: 0.85rem; color: var(--淡); }
+.考え summary { cursor: pointer; }
+.考え文 { white-space: pre-wrap; border-left: 3px solid var(--線); padding: 4px 10px; margin-top: 4px; }
+
+/* --- 答えの書式 --- */
+.本文 > :first-child { margin-top: 0; }
+.本文 > :last-child { margin-bottom: 0; }
+.本文 p { margin: 0.5em 0; }
+.本文 h3, .本文 h4, .本文 h5, .本文 h6 { margin: 0.8em 0 0.3em; line-height: 1.4; }
+.本文 ul, .本文 ol { margin: 0.4em 0; padding-left: 1.6em; }
+.本文 li > p { margin: 0.2em 0; }
+.本文 blockquote { margin: 0.5em 0; padding: 0 0 0 12px; border-left: 3px solid var(--線); color: var(--淡); }
+.本文 code { background: var(--コード地); border-radius: 4px; padding: 0.1em 0.35em; font-size: 0.9em; font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+.本文 a { color: var(--自分); }
+@media (prefers-color-scheme: dark) { .本文 a { color: var(--主); } }
+.コード { position: relative; margin: 0.6em 0; background: var(--コード地); border-radius: 8px; }
+.コード pre { margin: 0; padding: 12px; overflow-x: auto; line-height: 1.5; }
+.コード pre code { background: none; padding: 0; }
+.コード .言語 { position: absolute; top: 4px; left: 10px; font-size: 0.7rem; color: var(--淡); }
+.コード .言語 + .写す + pre { padding-top: 24px; }
+.コード .写す { position: absolute; top: 4px; right: 6px; padding: 0 8px; font-size: 0.7rem; }
+.表枠 { overflow-x: auto; margin: 0.5em 0; }
+.本文 table { border-collapse: collapse; font-size: 0.9em; }
+.本文 th, .本文 td { border: 1px solid var(--線); padding: 4px 10px; text-align: left; }
+.本文 hr { border: none; border-top: 1px solid var(--線); }
+
+/* --- 入力欄 --- */
+form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px max(16px, calc((100% - 820px) / 2));
+  border-top: 1px solid var(--線);
+  background: var(--面);
+}
+textarea {
+  flex: 1;
+  resize: none;
+  padding: 8px 10px;
+  border: 1px solid var(--線);
+  border-radius: 10px;
+  background: var(--地);
+  line-height: 1.5;
+}
+
+/* --- 狭い画面: 一覧は ☰ で出す --- */
+.携帯のみ { display: none; }
+#覆い { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); z-index: 5; }
+@media (max-width: 720px) {
+  .携帯のみ { display: inline-block; }
+  #横欄 { position: fixed; z-index: 10; inset: 0 auto 0 0; transform: translateX(-100%); transition: transform 0.2s; box-shadow: 2px 0 12px rgb(0 0 0 / 0.2); }
+  body.横欄開 #横欄 { transform: none; }
+  .発言, .発言.assistant, .失敗 { max-width: 100%; width: auto; }
+  .発言.assistant { width: 100%; }
+  .道具 button { opacity: 1; }
+  .項目 .消す { visibility: visible; }
+  select { max-width: 45%; }
+}
