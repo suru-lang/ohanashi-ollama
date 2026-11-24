@@ -36,6 +36,10 @@
       <label class="並び">温度 <input id="温度" type="range" min="0" max="2" step="0.1" value="0.8" disabled> <output id="温度値">0.8</output></label>
     </div>
     <label class="並び" id="砂場網欄" hidden><input id="砂場網" type="checkbox"> 💻 砂場からインターネットにつなぐ(pip install・apt-get install を使えるようにする)</label>
+    <div class="行" id="更新欄" hidden>
+      <button id="再起動" type="button" class="小">🔄 最新にして再起動</button>
+      <span id="更新状態" class="淡 小字"></span>
+    </div>
     <p class="淡 小字">設定は会話ごとにしまいます。次に送るときから使います。</p>
   </section>
   <div id="知らせ" hidden></div>
