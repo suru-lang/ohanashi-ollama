@@ -9,6 +9,7 @@
 // Write のリポジトリには、モデルが確かめずに issue を書きます(github_issue)。
 // 読む前に {"running":…}、読んだ後に {"tool":{"name":"github_…","summary":…}} が届き、summary の1行を答えに残します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
+// 考えと道具を使った跡は、最後の答えの上の、はじめは閉じた「途中経過」の欄に入れます(読み込んだ会話でも)。
 
 const $ = (id) => document.getElementById(id);
 const 会話欄 = $("会話");
@@ -202,7 +203,7 @@ function 本文に印付け() {
   if (!強調語) return;
   const 正規 = new RegExp(正規逃避(強調語), "i");
   const 最初 = [];
-  for (const 本 of 会話欄.querySelectorAll(".発言 .本文")) {
+  for (const 本 of 会話欄.querySelectorAll(".発言 .本文, .発言 .途中文")) {
     const 歩 = document.createTreeWalker(本, NodeFilter.SHOW_TEXT);
     const 節群 = [];
     while (歩.nextNode()) if (正規.test(歩.currentNode.nodeValue)) 節群.push(歩.currentNode);
@@ -216,11 +217,12 @@ function 本文に印付け() {
       節.replaceWith(断);
     }
   }
+  for (const m of 最初) { const 欄 = m.closest(".途中"); if (欄) 欄.open = true; } // 途中経過に見つかったら開く
   if (最初.length) 最初[0].scrollIntoView({ block: "center" });
 }
 
 function 印消し() {
-  for (const m of 会話欄.querySelectorAll(".本文 mark")) m.replaceWith(m.textContent);
+  for (const m of 会話欄.querySelectorAll(".本文 mark, .途中文 mark")) m.replaceWith(m.textContent);
 }
 
 // 1回目で「消す?」になり、もう1回押すと消す
@@ -437,11 +439,32 @@ function 発言を足す(役, 内容) {
   return el;
 }
 
-function 中身を書く(el, 内容) {
+// 答えは、途中経過(考えと道具を使った跡)を畳んだ欄に入れ、最後の答えだけを開いて出す。
+// 様子.考え は考えの文、様子.今 は答えを受け取っている間に畳んだ欄の題に出す、今していること
+function 中身を書く(el, 内容, 様子 = {}) {
   el.dataset.内容 = 内容;
   const 本 = el.querySelector(".本文");
-  if (el.classList.contains("assistant")) 本.innerHTML = 書式化(内容);
-  else 本.textContent = 内容;
+  if (!el.classList.contains("assistant")) { 本.textContent = 内容; return; }
+  const 分 = 途中を分ける(内容);
+  本.innerHTML = 書式化(分.答え);
+  const 考え = 様子.考え || "";
+  let 欄 = el.querySelector(".途中");
+  if (!分.途中 && !考え && !様子.今) { if (欄) 欄.remove(); return; }
+  if (!欄) {
+    欄 = document.createElement("details");
+    欄.className = "途中";
+    欄.innerHTML = "<summary></summary><div class=\"考え文\"></div><div class=\"途中文\"></div>";
+    本.before(欄);
+  }
+  const 考え文 = 欄.querySelector(".考え文"), 途中文 = 欄.querySelector(".途中文");
+  考え文.hidden = !考え;
+  if (考え文.textContent !== 考え) 考え文.textContent = 考え;
+  途中文.hidden = !分.途中;
+  if (途中文.dataset.内容 !== 分.途中) { 途中文.dataset.内容 = 分.途中; 途中文.innerHTML = 書式化(分.途中); }
+  const 題 = [];
+  if (考え) 題.push("考えたこと");
+  if (分.手順) 題.push(`道具 ${分.手順} 回`);
+  欄.querySelector("summary").textContent = 様子.今 || (分.途中 ? `途中経過(${題.join("・")})` : "考えたこと");
 }
 
 function 写し取る(ボタン, 文) {
@@ -587,39 +610,32 @@ function 送受中にする(中) {
 async function 答えてもらう() {
   const el = 発言を足す("assistant", "");
   el.classList.add("待ち");
-  const 考え欄 = document.createElement("details");
-  考え欄.className = "考え";
-  考え欄.innerHTML = "<summary>考えています…</summary><div class=\"考え文\"></div>";
-  let 答え = "", 考え = "", 誤り = "", 統計 = null, 描く予定 = false, 出典 = [];
+  let 答え = "", 考え = "", 誤り = "", 統計 = null, 描く予定 = false, 出典 = [], 待つ = true;
   const ウェブ = ウェブ中(), 砂場 = 砂場中();
+  // 今していること。道具を使っている間は、畳んだ途中経過の題に出す
+  let 様子 = !ウェブ && 砂場 ? "💻 砂場を用意しています…" : "";
   const 調べ欄 = document.createElement("div");
   調べ欄.className = "調べ";
-  if (ウェブ) 調べ欄.textContent = "🌐 ウェブで調べています…";
-  else if (砂場) 調べ欄.textContent = "💻 砂場を用意しています…";
-  if (ウェブ || 砂場) el.prepend(調べ欄);
+  if (ウェブ) { 調べ欄.textContent = "🌐 ウェブで調べています…"; el.prepend(調べ欄); }
   中断 = new AbortController();
   送受中にする(true);
   const 描く = () => {
     描く予定 = false;
-    中身を書く(el, 答え + 出典文(出典));
-    if (考え) {
-      if (!考え欄.isConnected) el.prepend(考え欄);
-      考え欄.querySelector(".考え文").textContent = 考え;
-      考え欄.querySelector("summary").textContent = 答え ? "考えたこと" : "考えています…";
-    }
+    const 今の題 = !待つ ? "" : 様子 || (考え && !答え ? "考えています…" : "");
+    中身を書く(el, 答え + 出典文(出典), { 考え, 今: 今の題 });
     const 近い = 会話欄.scrollHeight - 会話欄.scrollTop - 会話欄.clientHeight < 80;
     if (近い) 下へ();
   };
   const 受け取る = (通知) => {
-    if (通知.content) 答え += 通知.content;
+    if (通知.content) { 答え += 通知.content; 様子 = ""; }
     if (通知.thinking) 考え += 通知.thinking;
     if (通知.error) 誤り = 通知.error;
     if (通知.stats) 統計 = 通知.stats;
     if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
     if (通知.notice) 調べ欄.textContent = `${通知.notice}`;
-    if (通知.running) 調べ欄.textContent = 通知.running.startsWith("🐙") ? 通知.running : `💻 動かしています: ${通知.running}`;
-    if (通知.tool) { 答え += 道具文(通知.tool); 調べ欄.textContent = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
-    if (!調べ欄.isConnected && (通知.notice || 通知.running)) el.prepend(調べ欄);
+    if (通知.running) 様子 = 通知.running.startsWith("🐙") ? 通知.running : `💻 動かしています: ${通知.running}`;
+    if (通知.tool) { 答え += 道具文(通知.tool); 様子 = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
+    if (!調べ欄.isConnected && 通知.notice) el.prepend(調べ欄);
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
   };
   let 止めた = false;
@@ -633,6 +649,7 @@ async function 答えてもらう() {
     if (e.name === "AbortError") 止めた = true;
     else 誤り = String(e.message || e);
   }
+  待つ = false;
   描く();
   el.classList.remove("待ち");
   const 番号 = 今.id;
