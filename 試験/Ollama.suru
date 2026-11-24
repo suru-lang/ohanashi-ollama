@@ -8,7 +8,7 @@ Ollama内の通知 を 通知文にする は 文字列 を 返す
 （s という Ollama内の断片） を 通知文にする とは 「断片:」 + s
 （s という Ollama内の考え） を 通知文にする とは 「考え:」 + s
 （群 という Ollama内の道具呼出） を 通知文にする とは 「道具:」 + （（群 の JSON配列） を JSON文字列にする）
-（語数 は n で 秒 は t という Ollama内の完了） を 通知文にする とは 「完了:」 + （n を 文字列化する） + 「/」 + （t を 文字列化する）
+（語数 は n で 秒 は t で 送語数 は p という Ollama内の完了） を 通知文にする とは 「完了:」 + （n を 文字列化する） + 「/」 + （t を 文字列化する） + 「/」 + （p を 文字列化する）
 （e という Ollama内の誤り） を 通知文にする とは 「誤り:」 + e
 x を 通知文にする とは 「無言」
 
@@ -19,7 +19,7 @@ x を 通知文にする とは 「無言」
 通知試験する とは 入出力手順
   （「{"model":"m","message":{"role":"assistant","content":"こん"},"done":false}」 を 読んだ通知にする） を 「断片:こん」 に 一致確認する
   （「{"model":"m","message":{"role":"assistant","content":"","thinking":"ふむ"},"done":false}」 を 読んだ通知にする） を 「考え:ふむ」 に 一致確認する
-  （「{"model":"m","message":{"role":"assistant","content":""},"done":true,"eval_count":42,"eval_duration":2000000000}」 を 読んだ通知にする） を 「完了:42/2」 に 一致確認する
+  （「{"model":"m","message":{"role":"assistant","content":""},"done":true,"eval_count":42,"eval_duration":2000000000,"prompt_eval_count":900}」 を 読んだ通知にする） を 「完了:42/2/900」 に 一致確認する
   （「{"error":"model \"x\" not found"}」 を 読んだ通知にする） を 「誤り:model "x" not found」 に 一致確認する
   （「」 を 読んだ通知にする） を 「無言」 に 一致確認する
   （「{"model":"m","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run","arguments":{"command":"ls"}}}]},"done":false}」 を 読んだ通知にする） を 「道具:[{"function":{"name":"run","arguments":{"command":"ls"}}}]」 に 一致確認する
@@ -28,7 +28,7 @@ x を 通知文にする とは 「無言」
 本文試験する は 真偽 を 返す 入出力動作
 本文試験する とは 入出力手順
   群 とは （役 は 「user」 で 内容 は 「やあ」 の 会話帳内の発言） を 空 に 挿入する
-  c とは 番号 は 1 で 題 は 「t」 で モデル は 「llama3.2」 で 指示 は 「」 で 温度 は -1 で 網 は 0 で 倉 は 「」 の 会話帳内の会話
+  c とは 番号 は 1 で 題 は 「t」 で モデル は 「llama3.2」 で 指示 は 「」 で 温度 は -1 で 網 は 0 で 倉 は 「」 で メモ は 「」 の 会話帳内の会話
   （c で 群 を Ollama内の要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"user","content":"やあ"}],"stream":true}」 に 一致確認する
   d とは 指示 は 「短く」 で 温度 は 0.5 の c
   （d で 群 を Ollama内の要求本文にする） を 「{"model":"llama3.2","messages":[{"role":"system","content":"短く"},{"role":"user","content":"やあ"}],"stream":true,"options":{"temperature":0.5}}」 に 一致確認する

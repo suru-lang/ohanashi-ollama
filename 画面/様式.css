@@ -86,6 +86,11 @@ button:disabled { opacity: 0.5; cursor: default; }
 .項目 .消す { visibility: hidden; border: none; background: none; padding: 4px 8px; font-size: 0.85rem; }
 .項目:hover .消す, .項目 .消す.確認, .項目.今 .消す { visibility: visible; }
 .消す.確認 { color: var(--誤); font-weight: 700; }
+.誤り字 { color: var(--誤); }
+/* 開いている会話の下に並べるスレッド */
+.スレッド項目 { margin-left: 14px; border-left: 2px solid var(--線); border-radius: 0 8px 8px 0; }
+.スレッド項目 a { padding: 4px 8px; font-size: 0.9rem; }
+.スレッド項目.今 { border-left-color: var(--自分); }
 #検索 { padding: 6px 10px; border: 1px solid var(--線); border-radius: 10px; background: var(--面); }
 .抜粋 { color: var(--淡); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; }
 .見つからない { margin: 8px; }
@@ -114,7 +119,11 @@ h1 {
   border-radius: 6px;
   padding: 2px 4px;
 }
-h1[contenteditable="true"] { outline: 2px solid var(--自分); white-space: normal; }
+h1[contenteditable="true"], #会話題[contenteditable="true"] { outline: 2px solid var(--自分); white-space: normal; }
+#会話題 { max-width: 30%; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; font-size: 0.9rem; border-radius: 6px; padding: 2px 4px; }
+#会話題::after { content: " ›"; }
+#会話題[contenteditable="true"]::after { content: ""; }
+#新スレッド { white-space: nowrap; }
 select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); }
 #設定欄 {
   padding: 12px 16px;
@@ -164,6 +173,11 @@ select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-
 .発言.待ち .道具 { visibility: hidden; }
 .失敗 { align-self: flex-start; color: var(--誤); border: 1px solid var(--誤); border-radius: 14px; padding: 8px 14px; max-width: 88%; overflow-wrap: anywhere; }
 .失敗 button { margin-left: 8px; padding: 2px 10px; }
+/* スレッドが長くなった知らせと、まとめの欄 */
+.長さ知らせ, .まとめ欄 { align-self: stretch; border: 1px solid var(--線); background: var(--面); border-radius: 14px; padding: 10px 14px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px; }
+.長さ知らせ.超え { border-color: var(--誤); }
+.長さ知らせ .行, .まとめ欄 .行 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.まとめ欄 textarea { width: 100%; min-height: 8em; font: inherit; padding: 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); color: inherit; resize: vertical; box-sizing: border-box; }
 
 /* 途中経過(考えと道具を使った跡)。はじめは畳んでおき、押すと開く */
 .途中 { margin-bottom: 6px; font-size: 0.85rem; color: var(--淡); }
@@ -229,8 +243,9 @@ button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
   body.横欄開 #横欄 { transform: none; }
   .発言, .発言.assistant, .失敗 { max-width: 100%; width: auto; }
   .発言.assistant { width: 100%; }
-  button.切替 .字 { display: none; }
+  button.切替 .字, #新スレッド .字 { display: none; }
+  #会話題 { display: none !important; }
   .道具 button { opacity: 1; }
   .項目 .消す { visibility: visible; }
-  select { max-width: 45%; }
+  select { max-width: 35%; }
 }

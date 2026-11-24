@@ -4,7 +4,8 @@
 
 - モデルを画面で選べます(Ollama に入っているモデルの一覧から)
 - 会話は SQLite のファイルにしまうので、閉じても続きから話せます。左の一覧から前の会話を開けます
-- 左の「会話を探す」で、題と発言の中身から会話を探せます。開くと見つかった所に印が付きます
+- 会話の中に話題ごとの「スレッド」を作れます(見出しの「＋ スレッド」)。モデルに送るのはそのスレッドの発言だけなので、長くなっても速いままです。リポジトリ・指示・モデルなどの設定は会話のものを、どのスレッドでもそのまま使います。前のスレッドで決めたことは、会話の「📒 メモ」に書いて(答えの「メモに足す」でも)次のスレッドに持ち越せます
+- 左の「会話を探す」で、題と発言の中身からスレッドを探せます。開くと見つかった所に印が付きます
 - 答えは届いたところから少しずつ出ます。「止める」で途中で止められます(そこまでの答えは残ります)
 - 答えの Markdown(コード・箇条書き・表など)を整えて出し、コードは「写す」でコピーできます
 - 会話ごとに、指示(システムプロンプト)と温度を決められます
@@ -174,7 +175,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 
 - 道具の名前・リポジトリ・枝を書く: 「github_push ツールを使って、ohanashi/add-c-hello-world ブランチに push してください」「github_pr ツールを使って、ohanashi/add-c-hello-world ブランチから main ブランチに対して PR を開いてください」
 - clone → 直す → push → PR を、1回に1つずつ頼む
-- 作業ごとに新しい会話にする(長い会話では、前の失敗や作り話に引きずられます)
+- 作業ごとに新しいスレッドにする(見出しの「＋ スレッド」。長いスレッドでは、前の失敗や作り話に引きずられます)。リポジトリの設定と、砂場に clone したものはそのまま使えます
 - 本当に道具を使ったかは、途中経過の題(「途中経過(道具: github_push)」)か、起動した端末の `[会話 番号] 道具 …` の行で確かめる
 
 #### 鍵の作り方
@@ -194,6 +195,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 ```sh
 kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許しの試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
+node 道具/道試験.js          # 画面の道(#会話/スレッド)の試験
 ```
 
 本物の LLM の代わりに、決まった答えを返す偽の Ollama([道具/偽Ollama.suru](道具/偽Ollama.suru))で、全部を動かして確かめられます。
@@ -205,7 +207,7 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435   # SearXNG で試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、「issue を作って」なら `o/r` に issue を作り、「issue を閉じて」なら `o/r` の #1 を閉じ、「clone して」「push して」「main に push して」「PR を作って」でそれぞれの道具を呼びます。偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、「issue を作って」なら `o/r` に issue を作り、「issue を閉じて」なら `o/r` の #1 を閉じ、「clone して」「push して」「main に push して」「PR を作って」でそれぞれの道具を呼びます。「発言の数」を含む問いには届いた問いの数(「 [問い 2]」)を付け、スレッドのまとめの問いには「まとめ: 発言 N 個」を返します。終わりの `prompt_eval_count` は、届いた発言の JSON の文字の数です。偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -220,7 +222,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
-| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
+| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道) |
 
 依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)です。
 
@@ -234,16 +236,16 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET /api/conversations` | 会話の一覧(新しく話した順。`"threads"` はスレッドの数) |
 | `POST /api/search` | 題か発言に言葉を含むスレッド `{"q":…}` → `[{"id":会話,"thread":スレッド,"title":…,"threadTitle":…,"snippet":…}, …]` |
 | `POST /api/conversations` | 会話を1つ目のスレッドといっしょに作る `{"model":…}` |
-| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身(設定と `"threads":[{"id":…,"title":…,"updated":…}]`)を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)を変える・消す(スレッドと発言も消える) |
+| `GET・PUT・DELETE /api/conversations/番号` | 会話の中身(設定と `"threads":[{"id":…,"title":…,"updated":…}]`)を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)とメモ(`"memo":…`、8000 文字まで)を変える・消す(スレッドと発言も消える) |
 | `GET・POST /api/conversations/番号/threads` | スレッドの一覧・スレッドを作る `{"title":…}`(省ける) |
 | `GET・PUT・DELETE /api/threads/番号` | スレッドの中身 `{"id":…,"conversation":…,"title":…,"messages":[…]}` を読む・題を変える・消す(会話の最後のスレッドは消せない) |
 | `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
 | `DELETE /api/threads/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しいスレッドに発言を足す・最後の答えを消して、会話の中身(`"messages"` は一番新しいスレッドの発言)を返す |
-| `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
+| `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しく作ったスレッドに発言を足す・最後の答えを消して、スレッドの中身を返す |
+| `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"summary":true` なら、スレッドのまとめを流す(しまわない)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
-流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
+流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…,"prompt":送った文のトークンの数}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
 
 ## 決めたこと
 
@@ -265,6 +267,14 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 5. **前の道も残す。** `/api/conversations/番号/messages`・`/last-answer` と WebSocket の `{"conversation":番号}` は、その会話の一番新しく作ったスレッドのこととして動きます。開いたままの前の版の画面でも話せるようにするためです。
 6. **題はスレッドごと。** スレッドに最初の問いを足すと、その1行目のはじめの 40 文字をスレッドの題にします(会話の題が空なら、会話の題にも)。
 7. **会話の最後のスレッドは消せない。** スレッドのない会話を作らないように、最後の1つを消すときは会話ごと消します。
+8. **画面の道は `#会話/スレッド`。** 読み込み直しても同じスレッドを開きます。前の版の `#会話` のリンクは、その会話の一番新しく話したスレッドを開きます。道の読み書きは `画面/道.js` にまとめ、`node 道具/道試験.js` で確かめます。
+9. **一覧は開いている会話の下にスレッドを並べる。** スレッドが2つ以上あるときだけ、開いている会話の下に、新しく話した順に並べます。ほかの会話はたたんだまま、スレッドの数だけを出します。会話を探したときは、見つかったスレッドを「会話の題 › スレッドの題」で並べます。
+10. **見出しの題は2つ。** 大きいほうがスレッドの題、その前の小さいほうが会話の題で、どちらも押すと変えられます。会話の中身(`GET /api/conversations/番号`)は設定とスレッドの一覧だけを返し、発言はスレッドの中身で読みます。
+11. **答えはそのスレッドにしまう。** 答えを受け取っている間にほかのスレッドを開くと、今までと同じく答えを止めますが、そこまでの答えは頼んだスレッドにしまいます。
+12. **会話のメモで次のスレッドへ持ち越す。** 会話に `メモ`(8000 文字まで)の列を足し、送るときに会話の指示のあとへ「## これまでのスレッドで分かったこと」として足します。ほかのスレッドの発言を送らないかわりに、決めたこと(枝の名前・試験の動かし方など)を短く渡すためです。指示(どう答えるか)と分けたのは、答えから足した文が人の書いた指示を書きかえないようにするためです。
+13. **「メモに足す」は答えだけを足す。** 答えの「メモに足す」は、途中経過(考えと道具の跡)を除いた答えをメモの終わりに足して保存し、⚙ を開いて見せます。8000 文字を超えたら保存せず、短くするよう知らせます。
+14. **長くなったら新しいスレッドを勧める。** Ollama が答えの終わりに返す、送った文のトークンの数(`prompt_eval_count`。`stats` の `prompt`)が 4096(文脈の目安 8192 の半分)を超えたら、答えの下に「このスレッドは長くなりました」と「まとめて新しいスレッドへ」を出します。8192 を超えたら、前の発言が読まれていないおそれがあると出します。モデルごとの文脈の長さはまだ分からないので、多くのモデルで使える 8192 を目安にしました。閉じると、そのスレッドでは出しません。
+15. **まとめは流して、しまわない。** WebSocket に `{"thread":番号,"summary":true}` を送ると、スレッドの発言(道具の跡を除く)のあとに「次のスレッドに引き継ぐためにまとめて」という問いを足して、道具なしで答えを流します。長いスレッドは、はじめの 4 個と終わりの 30 個の発言だけを送ります。画面はまとめを直せる欄に出し、「新しいスレッドの頭に置く」(「題 の続き」のスレッドの最初の発言にする)か「メモに足して新しいスレッドへ」を選べます。もとのスレッドには何も足しません。答えをまとめるのに時間がかかるので、別の道で待たせずに、ふだんの答えと同じく流すことにしました。
 
 ### 画面
 

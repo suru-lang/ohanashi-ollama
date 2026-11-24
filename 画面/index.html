@@ -23,13 +23,19 @@
 <div id="本面">
   <header>
     <button id="横欄開く" type="button" class="小 携帯のみ" aria-label="会話の一覧">☰</button>
-    <h1 id="題" title="クリックで題を変えます">新しい会話</h1>
+    <span id="会話題" class="淡" title="クリックで会話の題を変えます" hidden></span>
+    <h1 id="題" title="クリックでスレッドの題を変えます">新しい会話</h1>
+    <button id="新スレッド" type="button" class="小" title="この会話に新しいスレッドを作ります。リポジトリなどの設定はそのまま使えます" hidden>＋<span class="字"> スレッド</span></button>
     <select id="モデル" aria-label="モデル"></select>
     <button id="設定開く" type="button" class="小" aria-label="設定" aria-expanded="false">⚙</button>
   </header>
   <section id="設定欄" hidden>
     <label>指示(システムプロンプト)
       <textarea id="指示" rows="3" placeholder="例: 日本語で、短く答えてください。"></textarea>
+    </label>
+    <label>📒 メモ(どのスレッドでも、モデルが「これまでのスレッドで分かったこと」として読みます。答えの「メモに足す」でも足せます)
+      <textarea id="メモ" rows="3" placeholder="例: 作業の枝は ohanashi/fix-login。試験は kumu 試験 で動かす。"></textarea>
+      <span id="メモ字数" class="淡 小字"></span>
     </label>
     <div class="行">
       <label class="並び"><input id="温度既定" type="checkbox" checked> 温度はモデルの既定</label>
@@ -54,7 +60,7 @@
       <button id="再起動" type="button" class="小">🔄 最新にして再起動</button>
       <span id="更新状態" class="淡 小字"></span>
     </div>
-    <p class="淡 小字">設定は会話ごとにしまいます。次に送るときから使います。</p>
+    <p class="淡 小字">設定は会話ごとにしまい、この会話のすべてのスレッドに効きます。次に送るときから使います。</p>
   </section>
   <div id="知らせ" hidden></div>
   <main id="会話" aria-live="polite">
@@ -73,6 +79,7 @@
   </form>
 </div>
 <script src="書式.js"></script>
+<script src="道.js"></script>
 <script src="動き.js"></script>
 </body>
 </html>
