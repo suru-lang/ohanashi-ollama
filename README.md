@@ -295,7 +295,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 12. **鍵は git のその時だけ渡す。** 鍵は、コンテナからは見えない `作業/.鍵`(700)に置いたファイルに書き、git を動かす sh がそれを読んですぐ消してから、`GIT_CONFIG_COUNT` などの環境変数で `http.extraHeader`(`Authorization: Basic …`)にします。コマンドの文字列(`ps` に出る)・`.git/config`・remote の URL には入れません。
 13. **push は新しい枝だけ。** `github_push` は、リポジトリの既定の枝への push を断り(空のリポジトリのはじめの commit だけは既定の枝に push できます)、`--force` もしません(先へ進めない push は GitHub が断ります)。枝の名前は英数字と `- _ . /` だけにし、コマンドに渡すときは `'…'` で囲みます。保護された枝は GitHub が断ります。
 14. **commit は変えたもの全部。** `github_push` は `git add -A` で全部を commit します。変えたものも、まだ push していない commit もなければ、push せずにそう返します。リポジトリの hook は動かしません(`core.hooksPath=/dev/null`)。
-15. **コンテナの中の git push は動かさない。** コンテナには鍵がないので、モデルが `run` で `git push` しようとしたら、動かさずに `github_clone`・`github_push` を使うように返します(小さいモデルが、鍵を聞かれて止まる `git push` をくり返したため)。
+15. **コンテナの中の git push は、サーバーが代わりに行う。** コンテナには鍵がないので、モデルが `run` で `git push` しようとしたら、コンテナでは動かさずに、`/work` の中の clone(remote が会話のリポジトリのもの)を探して、`github_push` と同じことをサーバーで行います。枝は `git push origin 枝` の枝、なければ今の枝です。push する先は remote ではなく会話のリポジトリの URL なので、コンテナの中で remote を変えられても、鍵がほかへ送られることはありません。会話にリポジトリがないときは、動かさずに `github_clone`・`github_push` の使い方を返します(小さいモデルは、道具を渡しても `git push` をくり返したため)。
 
 ## 今後の候補
 

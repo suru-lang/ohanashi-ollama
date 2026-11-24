@@ -28,3 +28,10 @@
   （「a/」 が GitHub作業内の枝形違いである） を 確認する
   （「a.lock」 が GitHub作業内の枝形違いである） を 確認する
   （「直す」 が GitHub作業内の枝形違いである） を 確認する
+
+押出試験する は 真偽 を 返す 入出力動作
+押出試験する とは 入出力手順
+  （「cd /work/r && git push -u origin ohanashi/x」 を GitHub作業内の押出枝抽出する） を 「ohanashi/x」 に 一致確認する
+  （「git push origin HEAD:refs/heads/fix && echo ok」 を GitHub作業内の押出枝抽出する） を 「fix」 に 一致確認する
+  （「git push」 を GitHub作業内の押出枝抽出する） を 「」 に 一致確認する
+  （「git push --set-upstream origin」 を GitHub作業内の押出枝抽出する） を 「」 に 一致確認する
