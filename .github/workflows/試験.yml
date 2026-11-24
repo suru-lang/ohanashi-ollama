@@ -261,6 +261,12 @@ jobs:
           grep -F 'head\:\ohanashi/test\' 出力/git答え3.文
           grep -F 'base\:\main\' 出力/git答え3.文
           grep -F '直しました\\n\\n— ohanashi-ollama(偽) で書きました' 出力/git答え3.文
+          # PR を作れていれば、作れていないという知らせは出さない
+          if grep -F 'PR を作れていません' 出力/git答え3; then exit 1; fi
+          # 道具を使わずに PR を作ったと答えたら、作れていないと知らせる
+          話す 'PR を作ったと言って' | tee 出力/git答え4
+          grep -F 'Pull Request #2' 出力/git答え4
+          grep -F '"notice":"⚠ この答えの中で、PR を作る道具(github_pr)は PR を作れていません' 出力/git答え4
           # 空のリポジトリは、はじめの commit を既定の枝に push できる
           curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":true},{"repo":"o/empty","write":true}]}' $B/api/conversations/1 > /dev/null
           話す '空を clone して' | grep -F '"summary":"🐙 o/empty を /work/empty に clone しました(空のリポジトリ)"'
