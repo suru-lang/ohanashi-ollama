@@ -1,5 +1,5 @@
 # ohanashi-ollama: ブラウザでローカルの Ollama とおしゃべりする Web アプリ
-#   kumu 実行 -- [--ollama URL] [--port ポート] [--db ファイル] [--screen フォルダ] [--searxng URL] [--web-search URL]
+#   kumu 実行 -- [--ollama URL] [--listen アドレス] [--port ポート] [--db ファイル] [--screen フォルダ] [--searxng URL] [--web-search URL]
 # 起動したら、ブラウザで http://localhost:8080/ を開きます。
 # 会話は SQLite のファイル(既定は ohanashi.db)にしまうので、閉じても続きから話せます。
 #
@@ -1226,6 +1226,6 @@ s を SearXNG確認する とは 入出力手順
   s を 砂場案内する
   もし s の 制御 ≠ 「」 ならば 「画面の ⚙ から、最新にして再起動できます(起動.sh)。」 を 表示する そうでなければ 0 を 結果にする
   （「会話は 」 + s の 帳 + 「 にしまいます。ブラウザで http://localhost:」 + （s の ポート を 文字列化する） + 「/ を開いてください。」） を 表示する
-  s の ポート を （s に 案内すること） で WebSocket内の待受する
+  s の 待受 + 「:」 + （s の ポート を 文字列化する） を （s に 案内すること） で WebSocket内の待受する
 
 始めする
