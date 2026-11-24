@@ -42,9 +42,9 @@
       <div class="行 倉追加">
         <input id="倉名" list="倉候補" placeholder="owner/名前" aria-label="足すリポジトリ" autocomplete="off">
         <datalist id="倉候補"></datalist>
-        <select id="倉権限" aria-label="権限">
+        <select id="倉権限" aria-label="権限" title="Write にすると、モデルが確かめずに issue を作る・直す・コメントする・閉じることがあります">
           <option value="read">Read(読むだけ)</option>
-          <option value="write">Write(書いてもよい)</option>
+          <option value="write">Write(issue を書いてもよい)</option>
         </select>
         <button id="倉足す" type="button" class="小">足す</button>
       </div>

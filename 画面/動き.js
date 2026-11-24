@@ -6,6 +6,7 @@
 // {"code":true} も送ると、モデルが砂場(Docker のコンテナ)でコマンドを動かします。動かす前に {"running":…}、
 // 動かした後に {"tool":…} が届くので、コマンドと出力を答えの中に Markdown のコードの塊として足します。
 // {"github":true} も送ると、モデルが会話のリポジトリ(⚙ で足す。Read か Write)を GitHub から読みます。
+// Write のリポジトリには、モデルが確かめずに issue を書きます(github_issue)。
 // 読む前に {"running":…}、読んだ後に {"tool":{"name":"github_…","summary":…}} が届き、summary の1行を答えに残します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
 
@@ -320,6 +321,7 @@ function 倉一覧表示() {
     名.textContent = x.repo;
     const 権 = document.createElement("select");
     権.setAttribute("aria-label", `${x.repo} の権限`);
+    権.title = "Write にすると、モデルが確かめずに issue を作る・直す・コメントする・閉じることがあります";
     for (const [値, 字] of [["read", "Read"], ["write", "Write"]]) {
       const o = document.createElement("option");
       o.value = 値;

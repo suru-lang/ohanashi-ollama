@@ -27,6 +27,14 @@ x を 倉表記にする とは x の 倉 + （もし x の 書込 ならば 「
   （群 の それぞれ を 倉表記にする） を （「o/r(R)」 を 空 に 挿入する） に 一致確認する
   （「」 を 許可 で GitHub道具内の倉群読取する） を 空 に 一致確認する
   （（「github_file」 が GitHub道具内のGitHub道具名である） かつ （「run」 が GitHub道具内のGitHub道具名でない）） を 確認する
-  （GitHub道具内の道具定義 の 長さ） を 4 に 一致確認する
+  （（群 を GitHub道具内の道具定義作成する） の 長さ） を 4 に 一致確認する
+  書群 とは 「[{"repo":"o/r","write":true}]」 を 許可 で GitHub道具内の倉群読取する
+  （（書群 を GitHub道具内の道具定義作成する） の 長さ） を 5 に 一致確認する
+  （（群 を GitHub道具内のGitHub案内にする） が 「github_issue で」 を 含有でない） を 確認する
+  （（書群 を GitHub道具内のGitHub案内にする） が 「github_issue で」 を 含有である） を 確認する
+  # 書いた本文の終わりに署名を付ける(2回は付けない)
+  （「直します」 に 「ohanashi-ollama(偽)」 を GitHub道具内の署名付加する） を （「直します」 + 改行 + 改行 + 「— ohanashi-ollama(偽) で書きました」） に 一致確認する
+  （（「直します」 + 改行 + 改行 + 「— ohanashi-ollama(偽) で書きました」） に 「ohanashi-ollama(偽)」 を GitHub道具内の署名付加する） を （「直します」 + 改行 + 改行 + 「— ohanashi-ollama(偽) で書きました」） に 一致確認する
+  （「」 に 「ohanashi-ollama(偽)」 を GitHub道具内の署名付加する） を 「— ohanashi-ollama(偽) で書きました」 に 一致確認する
   案内 とは 群 を GitHub道具内のGitHub案内にする
   （案内 が 「- o/r(読むだけ)」 を 含有である） を 確認する
