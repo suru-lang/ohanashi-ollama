@@ -691,7 +691,7 @@ async function WebSocketで聞く(本文, 受け取る, 合図) {
       if (通知.done) 成功();
       else 受け取る(通知);
     };
-    s.onclose = () => { 接続 = null; 失敗(合図.aborted ? new DOMException("止めました", "AbortError") : new Error("WebSocket が切れました")); };
+    s.onclose = () => { 接続 = null; 失敗(合図.aborted ? new DOMException("止めました", "AbortError") : new Error("サーバーとの接続が切れました。サーバーを動かしている端末にエラーが出ていないか見てください")); };
     合図.addEventListener("abort", () => s.close());
     s.send(本文);
   });
