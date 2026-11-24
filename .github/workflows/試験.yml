@@ -98,6 +98,32 @@ jobs:
             };'
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           kill %1 %2
+      - name: 砂場(Docker)でコードを動かす(Linux)
+        # macOS の GitHub の機械には Docker がないので Linux だけで。偽の Ollama は「コード」を含む問いに、hello.py を書いて動かす道具を呼ぶ
+        if: runner.os == 'Linux'
+        run: |
+          ./出力/偽Ollama 11435 > 出力/偽Ollama.log 2>&1 &
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/砂場.db --port 8092 --work 出力/作業 > 出力/アプリ3.log 2>&1 &
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8092/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8092
+          grep -F '砂場: Docker' 出力/アプリ3.log
+          curl -s $B/api/info | grep -F '"sandbox":true'
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"id":1'
+          curl -s -X POST -d '{"role":"user","content":"コードを書いて"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat | tee 出力/砂場答え
+          grep -F '{"running":"$ python hello.py"}' 出力/砂場答え
+          grep -F '{"tool":{"name":"run","command":"python hello.py","output":"こんにちは\n","code":0}}' 出力/砂場答え
+          grep -F '"path":"hello.py"' 出力/砂場答え
+          [ "$(cat 出力/作業/1/hello.py)" = "print('こんにちは')" ]
+          # 道具の結果がモデルに返り、もう一度答える(偽の Ollama は道具の結果をおうむ返しする)
+          [ "$(grep -o '"content":"[^"]*"' 出力/砂場答え | grep -v print | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "書いて動かします。おうむ返し: こんにちは\n\n(終了コード 0)" ]
+          docker ps --format '{{.Names}}' | grep -x ohanashi-8092-1
+          # 砂場を使わないときは道具を渡さない
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c running | grep -x 0
+          # 会話を消すとコンテナも消える
+          curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
+          ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1
+          kill %1 %2
       - name: 記録を出す(失敗したとき)
         if: failure()
         run: cat 出力/*.log || true
