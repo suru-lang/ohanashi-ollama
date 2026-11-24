@@ -9,6 +9,7 @@
 - 答えの Markdown(コード・箇条書き・表など)を整えて出し、コードは「写す」でコピーできます
 - 会話ごとに、指示(システムプロンプト)と温度を決められます
 - 考えるモデル(qwen3・deepseek-r1 など)の考えている途中の文は、たたんで出します
+- 「💻 砂場」を押しておくと、モデルが Docker のコンテナの中でコードを書いて動かし、結果を確かめてから答えます(Docker と、道具を使えるモデルが要ります)
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
 - 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
@@ -46,6 +47,9 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--db ファイル` | 会話をしまう SQLite のファイル | `ohanashi.db` |
 | `--screen フォルダ` | 画面のファイルのフォルダ | `画面` |
 | `--searxng URL` | ウェブ検索に使う SearXNG | 環境変数 `SEARXNG_URL`、なければ使わない |
+| `--sandbox-image イメージ` | 砂場のコンテナのイメージ | `python:3.12-slim` |
+| `--sandbox-network ネットワーク` | 砂場のコンテナの `--network` | `none`(外につながらない) |
+| `--work フォルダ` | 砂場と共有する作業フォルダの親 | `作業` |
 | `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
 
 ### ウェブで調べる
@@ -84,6 +88,19 @@ OLLAMA_API_KEY=キー kumu 実行
 
 調べた言葉(最後の問い)は SearXNG から検索サービスへ、または ollama.com へ送られます。ローカルの外に出したくない問いでは、ボタンを押さないでください。
 
+### 砂場でコードを動かす
+
+[Docker](https://www.docker.com/products/docker-desktop/) を動かしておくと、入力欄の横の「💻 砂場」を押せます。押して送ると、モデルに2つの道具を渡します。
+
+- `run`: シェルのコマンドを動かす(1つ 120 秒まで)
+- `write_file`: ファイルを書く
+
+モデルが道具を呼ぶと、会話ごとのコンテナ(`ohanashi-ポート-会話の番号`)の中で行い、結果をモデルに返して続きを答えてもらいます(1つの答えで 10 回まで)。書いたファイルとコマンドの出力は、答えの中にそのまま出ます。コンテナの `/work` は手元の `作業/会話の番号` と同じフォルダなので、できたファイルを手元で開けます。
+
+道具を使えるモデル(qwen3 など)で使ってください。はじめて使うときはイメージを取ってくるので、先に `docker pull python:3.12-slim` しておくと待たずに済みます。コンテナは外のネットワークにつながらないので、`pip install` はできません。使いたいときは `--sandbox-network bridge` を付けて起動します。ほかの言語を使うなら `--sandbox-image node:22` のようにイメージを変えます。
+
+コンテナは会話を消すと消えます(作業フォルダは残ります)。モデルが動かすコマンドは確かめずに行うので、作業フォルダに大事なファイルを置かないでください。
+
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
 ## 試験
@@ -112,6 +129,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [会話帳.suru](会話帳.suru) | 会話と発言を SQLite にしまう |
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
+| [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL` |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
 
@@ -121,7 +139,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 
 | 道 | 答え |
 |---|---|
-| `GET /api/info` | Ollama の場所と版、ウェブ検索を使えるか `{"ollama":…,"version":…,"web":真偽}` |
+| `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽}` |
 | `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
 | `GET /api/conversations` | 会話の一覧(新しく話した順) |
 | `POST /api/search` | 題か発言に言葉を含む会話 `{"q":…}` → `[{"id":…,"title":…,"snippet":…}, …]` |
@@ -129,10 +147,10 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET・PUT・DELETE /api/conversations/番号` | 会話の中身を読む・題とモデルと指示と温度を変える・消す |
 | `POST /api/conversations/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
 | `DELETE /api/conversations/番号/last-answer` | 最後の答えを消す(作り直すとき) |
-| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる |
+| `GET /ws`(WebSocket) | `{"conversation":番号}` が届くたびに、その会話を Ollama へ送り、答えを流す。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
-流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。WebSocket では最後に `{"done":true}` を送ります。
+流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。WebSocket では最後に `{"done":true}` を送ります。
 
 ## 決めたこと
 
@@ -162,6 +180,15 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 6. **ボタンの状態はブラウザが覚える。** 会話ごとではなく、`localStorage` に1つだけ覚えます。
 7. **SearXNG も使える。** ollama.com につながらない・アカウントを作りたくないときのために、自分で動かす SearXNG の JSON の API(`GET /search?q=…&format=json`)も使えるようにしました。問いは UTF-8 のバイトごとに `%XX` にして送り、結果のはじめの5つを使います。結果の形(`results` の `title`・`url`・`content`)は Ollama の API と同じなので、そのあとは同じに扱います。`SEARXNG_URL` があれば、Ollama のキーより先に使います。
 
+### 砂場
+
+1. **会話ごとに1つのコンテナ。** 最初に砂場を使うときに `docker run -d … sleep infinity` で作り、そのあとは `docker exec` でコマンドを動かします。同じ会話の中では、前に書いたファイルや入れたものが残ります。サーバーを起動し直しても、コンテナが動いていればそのまま使います。
+2. **外につながらない・使いすぎない。** 既定は `--network none` で、`--memory 2g --cpus 2 --pids-limit 512 --security-opt no-new-privileges` を付けます。1つのコマンドは `timeout 120` で止めます。モデルに返す出力は 8000 文字まで(長ければはじめと終わりの 4000 文字ずつ)です。
+3. **道具は2つだけ。** `run`(sh -c)と `write_file` です。ファイルを読むのは `run` で `cat` できるので、道具を少なくしてモデルが迷わないようにしました。
+4. **道具のくり返しはサーバーで。** モデルが `tool_calls` を返したら、サーバーが順に行い、`role: "assistant"`(呼び出し)と `role: "tool"`(結果)の発言を足して、もう一度 `/api/chat` に送ります。道具を呼ばなくなるか、10 回になるまでくり返します。
+5. **使った跡は答えといっしょに保存する。** 画面は `tool` を受け取ったら、書いたファイルとコマンドの出力を Markdown のコードの塊(`~~~~` で囲む)として答えに足し、その全体を保存します。次の問いのときには、モデルにも前に動かしたことが見えます。途中の `tool` の発言そのものは保存しません。
+6. **「プロセス」を使わない。** 標準の「プロセス」と「ファイル」(http ライブラリが読み込む)が C の `fread` を違う型で宣言していて、いっしょに読み込めません。そのため砂場は `system` と一時ファイルでコマンドを動かします。
+
 ## 今後の候補
 
 - 外からつなげないように、127.0.0.1 だけで待ち受ける(する の「通信」に、待ち受けるアドレスを選べる関数が要ります)
@@ -170,6 +197,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 - 会話を Markdown・JSON に書き出す
 - 画像を送る(Ollama の `images`、見えるモデル)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける
+- 砂場: 作業フォルダのファイルを画面で見る・落とす、コマンドを動かす前に確かめる、コンテナを手元の利用者で動かす
 - 長い会話を、モデルの文脈の長さ(`num_ctx`)に合わせて切り詰める
 - 問いを書き直して、そこから先を作り直す
 

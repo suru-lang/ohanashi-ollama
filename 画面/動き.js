@@ -3,6 +3,8 @@
 // ({"content"}・{"thinking"}・{"stats"}・{"error"})が届き、最後に {"done":true} が届きます。
 // {"web":true} も送ると、サーバーが先にウェブで調べて {"sources":[…]}(できなければ {"notice":…})を送ります。
 // 出典は答えの終わりに Markdown の番号付きの一覧として足して、答えといっしょに保存します。
+// {"code":true} も送ると、モデルが砂場(Docker のコンテナ)でコマンドを動かします。動かす前に {"running":…}、
+// 動かした後に {"tool":…} が届くので、コマンドと出力を答えの中に Markdown のコードの塊として足します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
 
 const $ = (id) => document.getElementById(id);
@@ -13,6 +15,7 @@ const 止めるボタン = $("止める");
 const モデル欄 = $("モデル");
 const 題欄 = $("題");
 const ウェブボタン = $("ウェブ");
+const 砂場ボタン = $("砂場");
 
 let 今 = null;          // 開いている会話 {id, title, model, system, temperature, messages}
 let 中断 = null;        // 答えを受け取っている間の AbortController
@@ -280,6 +283,32 @@ function ウェブ切替(押す) {
 }
 ウェブボタン.addEventListener("click", () => ウェブ切替(!ウェブ中()));
 
+// --- 砂場でコードを動かす ---
+
+function 砂場中() { return !砂場ボタン.disabled && 砂場ボタン.getAttribute("aria-pressed") === "true"; }
+function 砂場切替(押す) {
+  砂場ボタン.setAttribute("aria-pressed", String(押す));
+  保存する("砂場", 押す ? "1" : "");
+}
+砂場ボタン.addEventListener("click", () => 砂場切替(!砂場中()));
+
+const 拡張子言語 = { py: "python", js: "javascript", ts: "typescript", sh: "sh", rb: "ruby", go: "go", rs: "rust", c: "c", h: "c", cpp: "cpp", java: "java", html: "html", css: "css", json: "json", md: "markdown", yml: "yaml", yaml: "yaml", toml: "toml", sql: "sql", suru: "suru" };
+
+// 道具を使った跡を Markdown にする。中身に ``` があっても壊れないように ~~~~ で囲む
+function 道具文(t) {
+  const 囲 = "~~~~";
+  if (t.name === "run") {
+    const 出 = (t.output || "").replace(/\n$/, "");
+    const 印 = t.code ? `(終了コード ${t.code})` : "";
+    return `\n\n${囲}console\n$ ${t.command}\n${出}${出 && 印 ? "\n" : ""}${印}\n${囲}\n\n`;
+  }
+  if (t.name === "write_file") {
+    const 言語 = 拡張子言語[(t.path || "").split(".").pop()] || "";
+    return `\n\n📝 \`${t.path}\`(${t.output})\n\n${囲}${言語}\n${(t.content || "").replace(/\n$/, "")}\n${囲}\n\n`;
+  }
+  return `\n\n${t.name}: ${t.output || ""}\n\n`;
+}
+
 // 出典を答えの終わりに足す Markdown。題の [ ] と URL の ( ) は、リンクの書き方を壊さないように替える
 function 出典文(群) {
   if (!群.length) return "";
@@ -464,10 +493,12 @@ async function 答えてもらう() {
   考え欄.className = "考え";
   考え欄.innerHTML = "<summary>考えています…</summary><div class=\"考え文\"></div>";
   let 答え = "", 考え = "", 誤り = "", 統計 = null, 描く予定 = false, 出典 = [];
-  const ウェブ = ウェブ中();
+  const ウェブ = ウェブ中(), 砂場 = 砂場中();
   const 調べ欄 = document.createElement("div");
   調べ欄.className = "調べ";
-  if (ウェブ) { 調べ欄.textContent = "🌐 ウェブで調べています…"; el.prepend(調べ欄); }
+  if (ウェブ) 調べ欄.textContent = "🌐 ウェブで調べています…";
+  else if (砂場) 調べ欄.textContent = "💻 砂場を用意しています…";
+  if (ウェブ || 砂場) el.prepend(調べ欄);
   中断 = new AbortController();
   送受中にする(true);
   const 描く = () => {
@@ -487,12 +518,18 @@ async function 答えてもらう() {
     if (通知.error) 誤り = 通知.error;
     if (通知.stats) 統計 = 通知.stats;
     if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
-    if (通知.notice) 調べ欄.textContent = `🌐 ${通知.notice}`;
+    if (通知.notice) 調べ欄.textContent = `${通知.notice}`;
+    if (通知.running) 調べ欄.textContent = `💻 動かしています: ${通知.running}`;
+    if (通知.tool) { 答え += 道具文(通知.tool); 調べ欄.textContent = "💻 砂場で動かしました"; }
+    if (!調べ欄.isConnected && (通知.notice || 通知.running)) el.prepend(調べ欄);
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
   };
   let 止めた = false;
   try {
-    await 聞く(JSON.stringify(ウェブ ? { conversation: 今.id, web: true } : { conversation: 今.id }), 受け取る, 中断.signal);
+    const 頼み = { conversation: 今.id };
+    if (ウェブ) 頼み.web = true;
+    if (砂場) 頼み.code = true;
+    await 聞く(JSON.stringify(頼み), 受け取る, 中断.signal);
   } catch (e) {
     if (e.name === "AbortError") 止めた = true;
     else 誤り = String(e.message || e);
@@ -606,6 +643,11 @@ window.addEventListener("hashchange", 道から開く);
 (async () => {
   API("info").then((i) => {
     $("接続先").textContent = i.version ? `Ollama ${i.version} · ${i.ollama}` : `${i.ollama}(つながっていません)`;
+    if (i.sandbox) {
+      砂場ボタン.disabled = false;
+      砂場ボタン.title = "押してあると、モデルが砂場(Docker のコンテナ)でコードを書いて動かします";
+      砂場切替(保存値("砂場", "") === "1");
+    }
     if (i.web) {
       ウェブボタン.disabled = false;
       ウェブボタン.title = "押してあると、ウェブで調べてから答えます";
