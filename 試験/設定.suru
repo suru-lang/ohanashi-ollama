@@ -9,16 +9,16 @@
   （「127.0.0.1:11500」 を 基点にする） を 「http://127.0.0.1:11500」 に 一致確認する
   （「0.0.0.0」 を 基点にする） を 「http://127.0.0.1:11434」 に 一致確認する
 
-既定 とは 基点 は 「http://localhost:11434」 で ポート は 8080 で 帳 は 「ohanashi.db」 で 画面 は 「画面」 で SearXNG は 「」 で 検索鍵 は 「」 で 検索先 は 既定検索先 で 砂像 は 既定砂像 で 砂網 は 「none」 で 作業 は 「作業」 の 設定
+既定 とは 基点 は 「http://localhost:11434」 で ポート は 8080 で 帳 は 「ohanashi.db」 で 画面 は 「画面」 で SearXNG は 「」 で 検索鍵 は 「」 で 検索先 は 既定検索先 で 砂像 は 既定砂像 で 砂網 は 「none」 で 作業 は 「作業」 で 制御 は 「」 で 改訂 は 「」 で 起動時 は 0 の 設定
 
 （設定 と 文字列） の 成否 を 説明にする は 文字列 を 返す
-（s という 成功） を 説明にする とは s の 基点 + 「 」 + （s の ポート を 文字列化する） + 「 」 + s の 帳 + 「 」 + s の 画面 + 「 」 + s の 検索先 + 「 」 + s の SearXNG + 「 」 + s の 砂像 + 「 」 + s の 砂網 + 「 」 + s の 作業
+（s という 成功） を 説明にする とは s の 基点 + 「 」 + （s の ポート を 文字列化する） + 「 」 + s の 帳 + 「 」 + s の 画面 + 「 」 + s の 検索先 + 「 」 + s の SearXNG + 「 」 + s の 砂像 + 「 」 + s の 砂網 + 「 」 + s の 作業 + 「 」 + s の 制御 + 「 」 + s の 改訂
 （e という 失敗） を 説明にする とは 「失敗: 」 + e
 
 引数試験する は 真偽 を 返す 入出力動作
 引数試験する とは 入出力手順
-  （空 を 既定 で 引数解釈して 説明にする） を 「http://localhost:11434 8080 ohanashi.db 画面 https://ollama.com/api/web_search  python:3.12-slim none 作業」 に 一致確認する
-  （（「--port」 と 「9000」 と 「--ollama」 と 「192.168.1.5:11434」 と 「--db」 と 「/tmp/a.db」 と 「--screen」 と 「x」 と 「--web-search」 と 「http://localhost:11435/api/web_search」 と 「--searxng」 と 「http://localhost:8888/」 と 「--sandbox-image」 と 「node:22」 と 「--sandbox-network」 と 「bridge」 と 「--work」 と 「/tmp/w/」） を 既定 で 引数解釈して 説明にする） を 「http://192.168.1.5:11434 9000 /tmp/a.db x http://localhost:11435/api/web_search http://localhost:8888 node:22 bridge /tmp/w」 に 一致確認する
+  （空 を 既定 で 引数解釈して 説明にする） を 「http://localhost:11434 8080 ohanashi.db 画面 https://ollama.com/api/web_search  python:3.12-slim none 作業  」 に 一致確認する
+  （（「--port」 と 「9000」 と 「--ollama」 と 「192.168.1.5:11434」 と 「--db」 と 「/tmp/a.db」 と 「--screen」 と 「x」 と 「--web-search」 と 「http://localhost:11435/api/web_search」 と 「--searxng」 と 「http://localhost:8888/」 と 「--sandbox-image」 と 「node:22」 と 「--sandbox-network」 と 「bridge」 と 「--work」 と 「/tmp/w/」 と 「--control」 と 「出力/制御/」 と 「--revision」 と 「abc1234」） を 既定 で 引数解釈して 説明にする） を 「http://192.168.1.5:11434 9000 /tmp/a.db x http://localhost:11435/api/web_search http://localhost:8888 node:22 bridge /tmp/w 出力/制御 abc1234」 に 一致確認する
   （（（「--port」 と 「abc」） を 既定 で 引数解釈して 説明にする） が 「失敗: 」 で 先頭一致である） を 確認する
   （（「--port」 を 空 に 挿入する） を 既定 で 引数解釈して 説明にする） を 「失敗: --port の後ろに値がありません」 に 一致確認する
   （（「--何か」 と 「1」） を 既定 で 引数解釈して 説明にする） を 「失敗: 知らない引数です: --何か」 に 一致確認する

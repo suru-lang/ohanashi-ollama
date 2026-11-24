@@ -132,6 +132,32 @@ jobs:
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1
           kill %1 %2
+      - name: 起動.sh で、画面から頼んで動かし直す
+        run: |
+          ./出力/偽Ollama 11438 > 出力/偽Ollama4.log 2>&1 &
+          F=$!
+          ./起動.sh -- --ollama http://127.0.0.1:11438 --db 出力/起動.db --port 8094 > 出力/起動.log 2>&1 &
+          S=$!
+          for i in $(seq 300); do curl -s -o /dev/null http://127.0.0.1:8094/ && break; sleep 1; done
+          B=http://127.0.0.1:8094
+          curl -s $B/api/info | tee 出力/情報1 | grep -F '"restart":true'
+          grep -F '"revision":"'"$(git rev-parse --short HEAD)"'"' 出力/情報1
+          curl -s -X POST $B/api/restart | grep -F '{"restarting":true}'
+          OLD=$(grep -o '"started":[0-9.]*' 出力/情報1)
+          NEW=
+          for i in $(seq 120); do NEW=$(curl -s $B/api/info | grep -o '"started":[0-9.]*' || true); [ -n "$NEW" ] && [ "$NEW" != "$OLD" ] && break; sleep 1; done
+          [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]
+          grep -aF '画面から頼まれたので' 出力/起動.log
+          # 起動.sh を止めると、アプリも止まる
+          kill $S; sleep 3
+          ! curl -s -o /dev/null http://127.0.0.1:8094/
+          # 起動.sh から動かしていなければ、再起動は頼めない
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11438 --db 出力/起動.db --port 8097 > 出力/アプリ4.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8097/ && break; sleep 0.2; done
+          curl -s http://127.0.0.1:8097/api/info | grep -F '"restart":false'
+          curl -s -X POST http://127.0.0.1:8097/api/restart | grep -F '起動.sh から'
+          kill $A $F
       - name: 記録を出す(失敗したとき)
         if: failure()
         run: cat 出力/*.log || true

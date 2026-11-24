@@ -641,6 +641,32 @@ function 道から開く() {
 }
 window.addEventListener("hashchange", 道から開く);
 
+// --- 最新にして再起動(起動.sh から動かしたとき) ---
+// 押すと 起動.sh が git pull と kumu 作る をして、アプリを動かし直す。
+// 動き始めた時刻(started)が変わったら、画面を読み直す。作り直しに失敗したら、その理由を出す
+
+function 版表示(i) {
+  $("更新状態").textContent = i.update || (i.revision ? `版 ${i.revision}` : "");
+}
+
+let 起動時 = 0;
+
+async function 再起動する() {
+  $("再起動").disabled = true;
+  $("更新状態").textContent = "更新しています…";
+  try { await API("restart", "POST"); } catch (e) { $("更新状態").textContent = `頼めませんでした: ${e.message}`; $("再起動").disabled = false; return; }
+  for (let 回 = 0; 回 < 300; 回++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    let i;
+    try { i = await API("info"); } catch { $("更新状態").textContent = "動かし直しています…"; continue; }
+    if (i.started !== 起動時) { location.reload(); return; }
+    if (i.update.startsWith("失敗")) { 版表示(i); $("再起動").disabled = false; return; }
+  }
+  $("更新状態").textContent = "時間がかかっています。起動.sh の画面を見てください";
+  $("再起動").disabled = false;
+}
+$("再起動").addEventListener("click", 再起動する);
+
 // --- 始める ---
 
 (async () => {
@@ -652,6 +678,8 @@ window.addEventListener("hashchange", 道から開く);
       砂場切替(保存値("砂場", "") === "1");
       $("砂場網欄").hidden = false;
     }
+    起動時 = i.started;
+    if (i.restart) { $("更新欄").hidden = false; 版表示(i); }
     if (i.web) {
       ウェブボタン.disabled = false;
       ウェブボタン.title = "押してあると、ウェブで調べてから答えます";
