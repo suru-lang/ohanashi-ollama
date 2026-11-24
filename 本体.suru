@@ -323,7 +323,7 @@ s で c を 送出 に 頼 から 会話中継する とは 入出力手順
   砂 とは s で c を 送出 に （頼 の 書く） から 砂場準備した 結果
   倉群 とは s で c を 送出 に （頼 の 倉使用） から GitHub準備した 結果
   送る群 とは （（調べ群 に 砂 を 砂案内付加する） に 倉群 を GitHub案内付加する） に 倉群 を 砂 で 作業案内付加する
-  （定 は s で 話 は c で 砂 は 砂 で 倉 は 倉群 で 余力 は 道具回数上限 で 作PR は （群 で 「 を作りました: 」 を 「github_pr」 が 済跡である） で 押済 は （群 で 「 に push しました(」 を 「github_push」 が 済跡である） で 促済 は 偽 の 巡依頼） で （c で 送る群 を Ollama内の発言JSON群にする） を 送出 に 巡回する
+  （定 は s で 話 は c で 砂 は 砂 で 倉 は 倉群 で 余力 は 道具回数上限 で 作PR は （群 で 「 を作りました: 」 を 「github_pr」 が 済跡である） で 押済 は （群 で 「 に push しました(」 を 「github_push」 が 済跡である） で 促数 は 0 の 巡依頼） で （c で 送る群 を Ollama内の発言JSON群にする） を 送出 に 巡回する
 
 # 前の答えに画面が足した道具の跡(~~~~ で囲んだ塊、「🐙 」「📝 」の行、見えない字の印の行)は、モデルに送らない。
 # 送ると、モデルが道具を使わずに同じ形の文(「🐙 … に push しました」など)を書くようになるため
@@ -413,8 +413,11 @@ b を （e という 失敗） で 送出 へ 用意結果処理する とは �
 
 # 定 は設定、話 は会話、砂 は砂場(なければ 無)、倉 は GitHub の道具で読めるリポジトリ(なければ 空)、余力 はあと何回道具を使えるか、
 # 作PR・押済 はこの答え(か前の答え)で github_pr が PR を作れたか・github_push(か run の git push)が push できたか
-# 促済 は、道具を使わずに「できた」と書いたモデルに、道具を使うよう頼み直したか
-巡依頼 とは 定 と 話 と 砂 と 倉 と 余力 と 作PR と 押済 と 促済 の 組
+# 促数 は、道具を使わずに(または道具が失敗したのに)「できた」と書いたモデルに、道具を使うよう頼み直した回数
+巡依頼 とは 定 と 話 と 砂 と 倉 と 余力 と 作PR と 押済 と 促数 の 組
+
+# 1つの答えの中で、頼み直す回数の限り
+促上限 とは 2
 # 1回の /api/chat で受け取ったもの: 画面へ送った数、答えの本文、道具の呼び出し
 巡 とは 送数 と 本文 と 呼出群 の 組
 
@@ -478,22 +481,42 @@ k が 押出成功である とは k の 返答 が 「Pushed commit 」 を 含
 # 道具を1回も使わずに「できた」と書いたとき、または道具の呼び出しを文で書いたときは、一度だけ、道具を使うようにモデルに頼み直す
 巡依頼 で JSON の リスト を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 巡 から 巡終了する は 数 を 返す 入出力動作
 r で 群 を 送出 に x から 巡終了する とは
-  もし 促可 かつ （文 ≠ 「」 または （x の 本文 を 文書呼出にする）） ならば r で 群 を 送出 に x から 道具促進する
+  もし 促可 かつ （文 ≠ 「」 または （x の 本文 を 文書呼出にする）） ならば r で 群 を 送出 に x から （r を x で 促文にする） より 道具促進する
   そうでなければ もし 文 = 「」 ならば x の 送数 を 結果にする
   そうでなければ x を 送出 に 文 で 未了知らせする
-ただし 促可 とは r の 促済 = 偽 かつ r の 余力 > 0 かつ x の 呼出群 の 長さ = 0 かつ （r の 倉 の 長さ > 0 または r の 砂 が 有である）
+ただし 促可 とは r の 促数 < 促上限 かつ r の 余力 > 0 かつ x の 呼出群 の 長さ = 0 かつ （r の 倉 の 長さ > 0 または r の 砂 が 有である）
 ただし 文 とは （（もし r の 作PR = 偽 かつ （x の 本文 を PR主張にする） ならば PR未作成注意 そうでなければ 「」） + （もし r の 押済 = 偽 かつ （x の 本文 を 押出主張にする） ならば 押出未了注意 そうでなければ 「」）） を 空白除去する
 
-巡依頼 で JSON の リスト を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 巡 から 道具促進する は 数 を 返す 入出力動作
-r で 群 を 送出 に x から 道具促進する とは 入出力手順
-  （「notice」 で （促知文 の JSON文字列） を 知らせ行にする） を 送出する
+巡依頼 で JSON の リスト を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 巡 から 促文 より 道具促進する は 数 を 返す 入出力動作
+r で 群 を 送出 に x から p より 道具促進する とは 入出力手順
+  （「notice」 で （p の 知 の JSON文字列） を 知らせ行にする） を 送出する
   （（「content」 と （（改行 + 改行） の JSON文字列） の JSON項目） を 一項目にして 行にする） を 送出する
   助手 とは （（「role」 と （「assistant」 の JSON文字列） の JSON項目） と （「content」 と （x の 本文 の JSON文字列） の JSON項目）） の JSON物
-  促 とは （（「role」 と （「user」 の JSON文字列） の JSON項目） と （「content」 と （促依頼文 の JSON文字列） の JSON項目）） の JSON物
-  回 とは （余力 は （r の 余力 - 1） で 促済 は 真 の r） で （群 + （助手 を 空 に 挿入する） + （促 を 空 に 挿入する）） を 送出 に 巡回した 結果
+  促 とは （（「role」 と （「user」 の JSON文字列） の JSON項目） と （「content」 と （p の 依頼 の JSON文字列） の JSON項目）） の JSON物
+  回 とは （余力 は （r の 余力 - 1） で 促数 は （r の 促数 + 1） の r） で （群 + （助手 を 空 に 挿入する） + （促 を 空 に 挿入する）） を 送出 に 巡回した 結果
   x の 送数 + 2 + 回 を 結果にする
 
 促知文 とは 「⚠ モデルが道具を使わずに、使ったように書いたので、道具を使うように頼み直しています…」
+
+# 画面に出す知らせと、モデルに送る頼み
+促文 とは 知 と 依頼 の 組
+
+# 「push した」「PR を作った」と書いたのに、道具の結果ではできていなければ、確かめてやり直すように頼む。
+# 道具の呼び出しを文で書いただけなら、道具を使うように頼む
+巡依頼 を 巡 で 促文にする は 促文 を 返す
+r を x で 促文にする とは
+  もし 未PR または 未押 ならば 知 は 再促知文 で 依頼 は （（もし 未押 ならば 押出再依頼文 そうでなければ 「」） + （もし 未PR ならば PR再依頼文 そうでなければ 「」） + 再依頼結び） の 促文
+  そうでなければ 知 は 促知文 で 依頼 は 促依頼文 の 促文
+ただし 未PR とは r の 作PR = 偽 かつ （x の 本文 を PR主張にする）
+ただし 未押 とは r の 押済 = 偽 かつ （x の 本文 を 押出主張にする）
+
+再促知文 とは 「⚠ モデルが『できた』と書きましたが、道具の結果ではまだできていないので、確かめてやり直すように頼んでいます…」
+
+押出再依頼文 とは 「Your answer says that the changes are on GitHub, but no github_push result in this answer says 'Pushed commit', so the push is not done. 」
+
+PR再依頼文 とは 「Your answer says that a pull request was opened, but no github_pr result in this answer says 'opened pull request', so there is no pull request yet. 」
+
+再依頼結び とは 「Look at the tool results above to see what went wrong (no tool was called for it, or the tool failed). Fix the cause, then call the tool again now (github_push to push the clone in /work to a new branch, github_pr to open the pull request from that branch). Say that it is done only after a tool result says so. If it cannot be done, tell the user why instead.」
 
 # 道具の呼び出しを、呼ばずに文で書いたか(「github_push repo=…」「run "cd …"」など。道具の名前と、引数らしい書き方の両方がある)
 文字列 を 文書呼出にする は 真偽 を 返す
@@ -541,6 +564,29 @@ r で h を 一道具実行する とは
   そうでなければ もし r で h が GitHub側である ならば （r の 定 を GitHub道具内の窓口作成する） で （r の 倉） に h を （r を 署名にする） から GitHub道具内のGitHub道具実行する
   そうでなければ （r の 砂 を 取出する） で h を 砂場内の道具実行する
 
+# push・PR・git commit の結果には、モデルへの「確かめて、失敗したらやり直して」という指示を添える(画面には出さない)
+# (小さいモデルは、失敗した結果を見ても、できたと書いたり、そのまま止まったりする)
+巡依頼 で JSON に 砂場内の道具結果 を 確認注付加する は 砂場内の道具結果 を 返す
+r で h に k を 確認注付加する とは
+  もし 名 = 「github_pr」 ならば k に （もし k が PR成功である ならば PR確認注 そうでなければ PR失敗注） を 返答付加する
+  そうでなければ もし 名 = 「github_push」 または （r で h が 代行押出である） ならば k に （もし k が 押出成功である ならば 押出確認注 そうでなければ 押出失敗注） を 返答付加する
+  そうでなければ もし 名 = 「run」 かつ （h から 「command」 を GitHub道具内の引数文にする） が 「git commit」 を 含有である ならば k に 委確認注 を 返答付加する
+  そうでなければ k
+ただし 名 とは h を 道具名にする
+
+砂場内の道具結果 に 文字列 を 返答付加する は 砂場内の道具結果 を 返す
+k に 文 を 返答付加する とは 返答 は （k の 返答 + 文） の k
+
+押出確認注 とは 「 Check it now, before you answer: call github_tree with this repo and ref set to the branch above, and see that your changed files are there. If something is missing, fix it in the clone in /work and call github_push again.」
+
+押出失敗注 とは 「 The push did not happen. Read the error above, fix the cause (for example: change the files first, use a new branch name, or call github_clone with fresh true), and call github_push again. Do not say that it is done.」
+
+PR確認注 とは 「 Check it now, before you answer: call github_issues with kind pr and the number above, and see that the branches and the title are right. Then give the user the link.」
+
+PR失敗注 とは 「 The pull request was not opened. Read the error above, fix the cause (for example: push the branch first with github_push, or use the right base branch), and call github_pr again. Do not say that it is done.」
+
+委確認注 とは 「 Check that the commit worked (for example with git status and git log --oneline -1) before you go on. To put it on GitHub, call github_push.」
+
 # 会話に GitHub のリポジトリがあるときに、run で git push しようとしたら、サーバーで代わりに push する
 # (コンテナには鍵がない。小さいモデルは github_push を使わずに git push しがちなため)
 巡依頼 で JSON が 代行押出である は 真偽 を 返す
@@ -576,7 +622,8 @@ s を 記録短縮する とは もし s の 長さ > 160 ならば （s から 
 r で 空 を 送出 に 順次道具実行する とは 空 を 結果にする
 r で （先頭 は h で 残り は 他） を 送出 に 順次道具実行する とは 入出力手順
   （「running」 で （（r で h を 道具説明にする） の JSON文字列） を 知らせ行にする） を 送出する
-  一 とは r で h を 一道具実行した 結果
+  素 とは r で h を 一道具実行した 結果
+  一 とは r で h に 素 を 確認注付加する
   （「tool」 で （一 の 画面） を 知らせ行にする） を 送出する
   （r で h に 一 を 道具記録文にする） を 表示する
   後 とは r で 他 を 送出 に 順次道具実行した 結果
