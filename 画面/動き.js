@@ -11,6 +11,9 @@
 // 読む前に {"running":…}、読んだ後に {"tool":{"name":"github_…","summary":…}} が届き、summary の1行を答えに残します。
 // WebSocket につなげないときは、POST api/chat で同じ JSON を1行ずつ受け取ります。
 // 考えと道具を使った跡は、最後の答えの上の、はじめは閉じた「途中経過」の欄に入れます(読み込んだ会話でも)。
+// 決まり(モデルに守ってほしいことを書いた文書)は api/rules でしまい、⚙ で会話に付けます(会話の rules に番号を順に)。
+// サーバーは、付けた決まりと会話の指示を1つの指示(system)にまとめて送ります。砂場か GitHub を使う答えでは、
+// 作業フォルダのリポジトリの OHANASHI.md・AGENTS.md・CLAUDE.md も読み、読んだときは {"notice":…} で知らせます。
 
 const $ = (id) => document.getElementById(id);
 const 会話欄 = $("会話");
@@ -32,6 +35,8 @@ let モデル群 = [];
 let 新規倉 = [];        // まだ会話を作っていないときに ⚙ で足したリポジトリ
 let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)。空ならどれでも足せる
 let 倉案内文 = "";
+let 決まり群 = [];      // しまってある決まりの一覧 [{id, name, default, length, uses}]
+let 新規決まり = null;  // まだ会話を作っていないときに ⚙ で選んだ決まりの番号(null なら既定の決まり)
 
 // --- サーバーとのやりとり ---
 
@@ -322,6 +327,7 @@ async function 新スレッド() {
 function 新規() {
   if (中断) 中断.abort();
   今 = null;
+  新規決まり = null;
   筋 = null;
   if (location.hash) history.replaceState(null, "", location.pathname);
   表示し直す();
@@ -593,6 +599,7 @@ function 設定欄表示() {
   $("メモ").value = 今 ? (今.memo || "") : "";
   メモ字数表示();
   倉一覧表示();
+  決まり一覧表示();
 }
 
 const メモ上限 = 8000;
@@ -642,6 +649,151 @@ $("温度").addEventListener("change", 設定保存);
 $("砂場網").addEventListener("change", 設定保存);
 $("メモ").addEventListener("input", メモ字数表示);
 $("メモ").addEventListener("change", 設定保存);
+
+// --- 決まり ---
+// 決まりは会話ごとではなく、しまっておいて、いくつでも会話に付けられる。直すと、付けている会話の次の答えから効く
+
+const 決まり上限 = 8000;
+const 決まり長い = 6000;   // 付けている決まりの合計がこれを超えたら、文脈が足りなくなるかもしれないと出す
+
+async function 決まり読込() {
+  try { 決まり群 = await API("rules"); } catch { 決まり群 = []; }
+  決まり一覧表示();
+}
+
+// 今の会話(会話を作る前なら、選んだもの。選んでいなければ既定のもの)に付ける決まりの番号
+function 今の決まり() {
+  if (今) return 今.rules || [];
+  return 新規決まり ?? 決まり群.filter((k) => k.default).map((k) => k.id);
+}
+
+function 決まり一覧表示() {
+  const 一覧 = $("決まり一覧");
+  一覧.textContent = "";
+  const 付 = 今の決まり();
+  for (const k of 決まり群) {
+    const li = document.createElement("li");
+    const 札 = document.createElement("label");
+    const 印 = document.createElement("input");
+    印.type = "checkbox";
+    印.checked = 付.includes(k.id);
+    印.addEventListener("change", () => 決まり付替(印.checked ? [...付, k.id] : 付.filter((n) => n !== k.id)));
+    札.append(印, ` ${k.name}`);
+    札.title = `${k.length} 文字` + (k.default ? "・新しい会話に最初から付けます" : "");
+    li.append(札);
+    一覧.append(li);
+  }
+  if (!決まり群.length) {
+    const li = document.createElement("li");
+    li.className = "淡 小字";
+    li.textContent = "まだありません。「決まりを作る・直す」で作ると、ここで会話に付けられます。";
+    一覧.append(li);
+  }
+  const 選 = 決まり群.filter((k) => 付.includes(k.id));
+  const 計 = 選.reduce((a, k) => a + k.length, 0);
+  $("決まり字数").textContent = 選.length ? `決まり ${選.length} つ・約 ${計} 文字` + (計 > 決まり長い ? "。モデルの文脈が短いと、会話の頭が切られます" : "") : "";
+  $("決まり字数").classList.toggle("誤り字", 計 > 決まり長い);
+  $("決まり数").hidden = !選.length;
+  $("決まり数").textContent = 選.length ? `📜${選.length}` : "";
+  $("設定開く").title = 選.length ? `設定(決まりを ${選.length} つ付けています)` : "設定";
+}
+
+async function 決まり付替(番号群) {
+  const 群 = [...new Set(番号群)];
+  if (!今) { 新規決まり = 群; 決まり一覧表示(); return; }
+  try { 今 = await API(`conversations/${今.id}`, "PUT", { rules: 群 }); }
+  catch (e) { 知らせる(`決まりを付けられませんでした(${e.message})`); }
+  決まり一覧表示();
+}
+
+// --- 決まりを作る・直す ---
+
+let 直す決まり = 0;   // 編集の欄で開いている決まりの番号(0 は新しい決まり)
+const 決まり案内文 = $("決まり案内").textContent;
+
+function 決まり選択表示() {
+  const 選 = $("決まり選択");
+  選.textContent = "";
+  for (const k of 決まり群) {
+    const o = document.createElement("option");
+    o.value = k.id;
+    o.textContent = k.name;
+    選.append(o);
+  }
+  const 新 = document.createElement("option");
+  新.value = 0;
+  新.textContent = "＋ 新しい決まり";
+  選.append(新);
+  選.value = 直す決まり;
+}
+
+async function 決まりを開く(番号) {
+  直す決まり = 番号;
+  決まり選択表示();
+  let k = { name: "", content: "", default: false };
+  if (番号) {
+    try { k = await API(`rules/${番号}`); }
+    catch (e) { 知らせる(`決まりを読めませんでした(${e.message})`); return; }
+  }
+  $("決まり名").value = k.name;
+  $("決まり内容").value = k.content;
+  $("決まり既定").checked = k.default;
+  $("決まり消す").hidden = !番号;
+  $("決まり案内").textContent = 決まり案内文;
+  決まり消す戻す();
+  決まり内容字数表示();
+}
+
+function 決まり内容字数表示() {
+  const n = $("決まり内容").value.length;
+  $("決まり内容字数").textContent = `${n} / ${決まり上限} 文字` + (n > 決まり上限 ? "(多すぎるので、短くするまで保存できません)" : "");
+  $("決まり内容字数").classList.toggle("誤り字", n > 決まり上限);
+}
+
+async function 決まり保存() {
+  const 本文 = { name: $("決まり名").value.trim(), content: $("決まり内容").value, default: $("決まり既定").checked };
+  if (!本文.name) { $("決まり名").focus(); 知らせる("決まりの名前を書いてください"); return; }
+  if (本文.content.length > 決まり上限) { $("決まり内容").focus(); 知らせる(`決まりは ${決まり上限} 文字までです`); return; }
+  try {
+    const k = 直す決まり ? await API(`rules/${直す決まり}`, "PUT", 本文) : await API("rules", "POST", 本文);
+    直す決まり = k.id;
+  } catch (e) { 知らせる(`決まりを保存できませんでした(${e.message})`); return; }
+  await 決まり読込();
+  決まり選択表示();
+  $("決まり消す").hidden = false;
+  $("決まり案内").textContent = `「${本文.name}」を保存しました。付けているすべての会話の次の答えから効きます。`;
+}
+
+// 1回目で「消す?(付けている会話の数)」になり、もう1回押すと消す
+function 決まり消す戻す() { $("決まり消す").classList.remove("確認"); $("決まり消す").textContent = "消す"; }
+async function 決まり消す() {
+  const ボタン = $("決まり消す");
+  if (!ボタン.classList.contains("確認")) {
+    const k = 決まり群.find((x) => x.id === 直す決まり);
+    ボタン.classList.add("確認");
+    ボタン.textContent = k && k.uses ? `消す?(${k.uses} つの会話に付いています)` : "消す?";
+    setTimeout(決まり消す戻す, 4000);
+    return;
+  }
+  try { await API(`rules/${直す決まり}`, "DELETE"); }
+  catch (e) { 知らせる(`決まりを消せませんでした(${e.message})`); return; }
+  if (新規決まり) 新規決まり = 新規決まり.filter((n) => n !== 直す決まり);
+  await 会話読み直す();
+  await 決まり読込();
+  決まりを開く(決まり群.length ? 決まり群[0].id : 0);
+}
+
+$("決まり直す").addEventListener("click", () => {
+  const 欄 = $("決まり編集");
+  欄.hidden = !欄.hidden;
+  $("決まり直す").setAttribute("aria-expanded", String(!欄.hidden));
+  if (!欄.hidden) 決まりを開く(決まり群.length ? (決まり群.find((k) => 今の決まり().includes(k.id)) || 決まり群[0]).id : 0);
+});
+$("決まり閉じる").addEventListener("click", () => { $("決まり編集").hidden = true; $("決まり直す").setAttribute("aria-expanded", "false"); });
+$("決まり選択").addEventListener("change", () => 決まりを開く(Number($("決まり選択").value)));
+$("決まり内容").addEventListener("input", 決まり内容字数表示);
+$("決まり保存").addEventListener("click", 決まり保存);
+$("決まり消す").addEventListener("click", 決まり消す);
 
 // --- 題を変える ---
 // 押すと書けるようになり、Enter かほかを押すと保存する。見出しの大きい題はスレッドの、小さい題は会話の題
@@ -909,7 +1061,8 @@ async function 送る() {
   try {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
-      今 = await API("conversations", "POST", { model: モデル欄.value });
+      今 = await API("conversations", "POST", { model: モデル欄.value, rules: 今の決まり() });
+      新規決まり = null;
       if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || $("メモ").value || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
       新規倉 = [];
       筋 = await API(`threads/${今.threads[0].id}`);
@@ -1036,6 +1189,7 @@ $("再起動").addEventListener("click", 再起動する);
     }
   }).catch(() => {});
   await モデル読込();
+  await 決まり読込();
   if (location.hash) 道から開く();
   else { 表示し直す(); 一覧読込(); }
 })();
