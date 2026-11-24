@@ -106,7 +106,9 @@ jobs:
           A=$!
           for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8093/ && break; sleep 0.2; done
           B=http://127.0.0.1:8093
-          grep -F 'GitHub: 試し としてつながりました。使えるリポジトリ: o/r,p/*' 出力/アプリ5.log
+          grep -F 'GitHub: 試し としてつながりました。会話に足せるリポジトリ: o/r,p/*' 出力/アプリ5.log
+          # 足すときの候補は、鍵で使えるリポジトリのうち --github-repos に入るもの
+          curl -s $B/api/github/repos | grep -xF '{"repos":["o/r","p/Tools"]}'
           if grep -F '試し鍵' 出力/アプリ5.log; then exit 1; fi
           curl -s $B/api/info | grep -F '"github":true,"githubRepos":["o/r","p/*"],"githubUser":"試し"'
           curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"repos":[]'
@@ -124,6 +126,16 @@ jobs:
           curl -s -X POST -d '{"model":"偽"}' $B/api/conversations > /dev/null
           curl -s -X POST -d '{"role":"user","content":"GitHub"}' $B/api/conversations/2/messages > /dev/null
           curl -s -X POST -d '{"conversation":2,"github":true}' $B/api/chat | grep -F '{"notice":"この会話には GitHub のリポジトリがありません。⚙ の設定で足してください"}'
+          kill $A
+          # --github-repos がなくても、鍵があれば使える。会話には、どのリポジトリでも足せる
+          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11436 --db 出力/GitHub2.db --port 8101 --github-api http://127.0.0.1:11436 > 出力/アプリ9.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8101/ && break; sleep 0.2; done
+          grep -F 'GitHub: 試し としてつながりました。会話に足せるリポジトリ: 鍵で使えるものはどれでも' 出力/アプリ9.log
+          curl -s http://127.0.0.1:8101/api/info | grep -F '"github":true,"githubRepos":[],"githubUser":"試し"'
+          curl -s http://127.0.0.1:8101/api/github/repos | grep -xF '{"repos":["o/r","x/y","p/Tools"]}'
+          curl -s -X POST -d '{"model":"偽"}' http://127.0.0.1:8101/api/conversations > /dev/null
+          curl -s -X PUT -d '{"repos":[{"repo":"x/y","write":true},{"repo":"bad"}]}' http://127.0.0.1:8101/api/conversations/1 | grep -F '"repos":[{"repo":"x/y","write":true}]'
           kill $A
           # 鍵が違えば、起動のときに知らせる(鍵は出さない)
           GITHUB_TOKEN=違う鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11436 --db 出力/GitHub.db --port 8098 --github-api http://127.0.0.1:11436 --github-repos o/r > 出力/アプリ6.log 2>&1 &

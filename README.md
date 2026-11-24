@@ -54,7 +54,7 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
 | `--control フォルダ` | 起動.sh と話すフォルダ(起動.sh が付けます) | なし(画面から再起動できない) |
 | `--revision 版` | 画面に出す版(起動.sh がコミットを付けます) | なし |
-| `--github-repos 一覧` | 会話に足してよい GitHub のリポジトリ(`owner/名前` か `owner/*` を「,」で区切る) | なし(GitHub を使わない) |
+| `--github-repos 一覧` | 会話に足してよい GitHub のリポジトリを絞る(`owner/名前` か `owner/*` を「,」で区切る) | なし(鍵で使えるものはどれでも足せる) |
 | `--github-token 鍵` | GitHub の鍵(個人アクセストークン) | 環境変数 `GITHUB_TOKEN`、なければ鍵なし(公開のリポジトリだけ、1時間に60回まで) |
 | `--github-api URL` | GitHub の API の基点(GitHub Enterprise なら `https://主機/api/v3`) | `https://api.github.com` |
 | `--github-git URL` | clone・push する URL の頭(`URL/owner/名前.git` を使う) | API の基点から決める(`https://github.com` など) |
@@ -126,13 +126,15 @@ OLLAMA_API_KEY=キー kumu 実行
 
 ### GitHub のリポジトリを読む
 
-使ってよいリポジトリを `--github-repos` で決めて起動します。鍵は環境変数で渡すと、`ps` に出ません。
+GitHub の鍵を環境変数 `GITHUB_TOKEN` に入れて起動します(環境変数で渡すと、`ps` に出ません)。
 
 ```sh
-GITHUB_TOKEN=github_pat_… kumu 実行 -- --github-repos suru-lang/suru,suru-lang/*
+GITHUB_TOKEN=github_pat_… kumu 実行
 ```
 
-起動すると「GitHub: 名前 としてつながりました。使えるリポジトリ: …」と出ます(鍵が違えば「注意: GitHub の鍵を確かめられませんでした(…)」)。画面の ⚙ の設定の「GitHub のリポジトリ」で、その会話で使うリポジトリを足し、それぞれ「読むだけ」か「読み書き」を選びます(`--github-repos` に合うものだけ足せます)。入力欄の横の「🐙 GitHub」を押して送ると、モデルに4つの道具を渡します。
+起動すると「GitHub: 名前 としてつながりました。」と出ます(鍵が違えば「注意: GitHub の鍵を確かめられませんでした(…)」)。リポジトリは、動かしている間に画面の ⚙ の設定の「GitHub のリポジトリ」で、会話ごとに足したり外したりします。それぞれ「読むだけ」か「読み書き」を選びます。足すときは、鍵で使えるリポジトリが候補に出ます(`owner/名前` を書けば、候補にないものも足せます)。
+
+足せるリポジトリを絞りたいときは、`--github-repos suru-lang/suru,suru-lang/*` のように起動します(鍵がなくても、ここに書いた公開のリポジトリは読めます)。入力欄の横の「🐙 GitHub」を押して送ると、モデルに4つの道具を渡します。
 
 - `github_repo`: リポジトリの設定(既定の枝・説明・トピック・ラベル)
 - `github_tree`: ファイルの一覧(枝と、フォルダで絞れる。400 まで)
@@ -217,6 +219,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 
 | 道 | 答え |
 |---|---|
+| `GET /api/github/repos` | 会話に足すリポジトリの候補(鍵で使えるもの。`--github-repos` があればそれに入るものだけ) `{"repos":[…]}` |
 | `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"github":真偽,"githubRepos":[…],"githubUser":…}` |
 | `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
 | `GET /api/conversations` | 会話の一覧(新しく話した順) |
@@ -278,7 +281,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 ### GitHub
 
 1. **API は suru-lang/github で。** GitHub の API を使うところは、ほかのアプリでも使えるように [suru-lang/github](https://github.com/suru-lang/github) に分けました。このアプリには、モデルの道具と、会話のリポジトリの許しだけを置きます。
-2. **リポジトリは2重に絞る。** 起動の `--github-repos` で足してよいものを決め、会話ごとに使うものを足します。サーバーは会話を保存するときに `--github-repos` に合わないものを除き、道具を行うときにも、会話にないリポジトリなら断ってモデルに理由を返します。英字の大文字小文字は区別しません。
+2. **リポジトリは鍵と会話で絞る。** どのリポジトリに届くかは、まず鍵の権限で決まります(fine-grained の鍵なら、選んだリポジトリだけ)。そのうえで、会話ごとに使うものを、動かしている間に画面で足します。起動のときに決めた一覧だけでは、使うたびに起動し直すことになるためです。もっと絞りたいときは `--github-repos` を付けます。サーバーは会話を保存するときに `--github-repos` に合わないものを除き、道具を行うときにも、会話にないリポジトリなら断ってモデルに理由を返します。英字の大文字小文字は区別しません。
 3. **Read と Write は会話ごと・リポジトリごと。** Claude のように、会話にリポジトリを足すときに「読むだけ」か「読み書き」を選びます。会話帳の `倉` の列に `[{"repo":…,"write":真偽}]` の JSON でしまいます(前の版の表には、起動したときに `ALTER TABLE` で足します)。
 4. **読むのは確かめずに行う。** 読む道具は、画面で確かめずに行います。
 5. **中身は保存しない。** 読んだファイルや issue は長く、リポジトリはあとで変わるので、モデルに渡すだけにします。画面には何を読んだかの1行だけを出し、それを答えといっしょに保存します。

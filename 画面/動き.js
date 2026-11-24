@@ -27,7 +27,7 @@ let 接続 = null;        // 開いている WebSocket
 let WebSocket可 = true; // つなげなかったら、fetch に切り替える
 let モデル群 = [];
 let 新規倉 = [];        // まだ会話を作っていないときに ⚙ で足したリポジトリ
-let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)
+let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)。空ならどれでも足せる
 let 倉案内文 = "";
 
 // --- サーバーとのやりとり ---
@@ -354,10 +354,24 @@ async function 倉保存(群) {
   倉一覧表示();
 }
 
-// 「owner/*」で許しているときは、そのどれでも足せる。足せるかはサーバーも確かめる
+// 「owner/*」で許しているときは、そのどれでも足せる。--github-repos がなければどれでも。足せるかはサーバーも確かめる
 function 許可済(倉) {
+  if (許可倉.length === 0) return true;
   const 小 = 倉.toLowerCase();
   return 許可倉.some((p) => { const q = p.toLowerCase(); return q.endsWith("/*") ? 小.startsWith(q.slice(0, -1)) && !小.slice(q.length - 1).includes("/") : 小 === q; });
+}
+
+function 倉候補表示(群) {
+  $("倉候補").textContent = "";
+  for (const p of [...new Set(群)]) { const o = document.createElement("option"); o.value = p; $("倉候補").append(o); }
+}
+
+// 鍵で使えるリポジトリを、足すときの候補にする(サーバーが GitHub に聞く。鍵は画面に来ない)
+async function 倉候補取得() {
+  try {
+    const r = await (await fetch("/api/github/repos")).json();
+    倉候補表示([...許可倉.filter((p) => !p.endsWith("/*")), ...(r.repos || [])]);
+  } catch (e) { /* 候補がなくても、名前を書けば足せる */ }
 }
 
 $("倉足す").addEventListener("click", async () => {
@@ -768,11 +782,11 @@ $("再起動").addEventListener("click", 再起動する);
       GitHubボタン.title = "押してあると、モデルが会話のリポジトリ(⚙ で足す)を GitHub から読みます";
       GitHub切替(保存値("GitHub", "") === "1");
       許可倉 = i.githubRepos || [];
-      $("倉候補").textContent = "";
-      for (const p of 許可倉.filter((p) => !p.endsWith("/*"))) { const o = document.createElement("option"); o.value = p; $("倉候補").append(o); }
+      倉候補表示(許可倉.filter((p) => !p.endsWith("/*")));
       $("倉欄").hidden = false;
-      倉案内文 = (i.githubUser ? `${i.githubUser} として読みます。` : "鍵がないので、公開のリポジトリだけ読めます。") + `足せるのは ${許可倉.join(", ")} です。`;
+      倉案内文 = (i.githubUser ? `${i.githubUser} として読みます。` : "鍵がないので、公開のリポジトリだけ読めます。") + (許可倉.length ? `足せるのは ${許可倉.join(", ")} です。` : "owner/名前 で、どのリポジトリでも足せます(使えるかは鍵の権限によります)。");
       $("倉案内").textContent = 倉案内文;
+      倉候補取得();
     }
     if (i.web) {
       ウェブボタン.disabled = false;
