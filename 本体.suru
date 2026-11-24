@@ -475,12 +475,13 @@ k が 押出成功である とは k の 返答 が 「Pushed commit 」 を 含
 
 # 答えの終わり。モデルが「PR を作った」「push した」と書いたのに、道具でできていなければ、そう知らせる
 # (小さいモデルは、道具を使わずに、または道具が失敗しても、できたと書くことがある)
-# 道具を1回も使わずに「できた」と書いたときは、一度だけ、道具を使うようにモデルに頼み直す
+# 道具を1回も使わずに「できた」と書いたとき、または道具の呼び出しを文で書いたときは、一度だけ、道具を使うようにモデルに頼み直す
 巡依頼 で JSON の リスト を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 巡 から 巡終了する は 数 を 返す 入出力動作
 r で 群 を 送出 に x から 巡終了する とは
-  もし 文 = 「」 ならば x の 送数 を 結果にする
-  そうでなければ もし r の 促済 = 偽 かつ r の 余力 > 0 かつ r の 倉 の 長さ > 0 かつ x の 呼出群 の 長さ = 0 ならば r で 群 を 送出 に x から 道具促進する
+  もし 促可 かつ （文 ≠ 「」 または （x の 本文 を 文書呼出にする）） ならば r で 群 を 送出 に x から 道具促進する
+  そうでなければ もし 文 = 「」 ならば x の 送数 を 結果にする
   そうでなければ x を 送出 に 文 で 未了知らせする
+ただし 促可 とは r の 促済 = 偽 かつ r の 余力 > 0 かつ x の 呼出群 の 長さ = 0 かつ （r の 倉 の 長さ > 0 または r の 砂 が 有である）
 ただし 文 とは （（もし r の 作PR = 偽 かつ （x の 本文 を PR主張にする） ならば PR未作成注意 そうでなければ 「」） + （もし r の 押済 = 偽 かつ （x の 本文 を 押出主張にする） ならば 押出未了注意 そうでなければ 「」）） を 空白除去する
 
 巡依頼 で JSON の リスト を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 巡 から 道具促進する は 数 を 返す 入出力動作
@@ -492,9 +493,17 @@ r で 群 を 送出 に x から 道具促進する とは 入出力手順
   回 とは （余力 は （r の 余力 - 1） で 促済 は 真 の r） で （群 + （助手 を 空 に 挿入する） + （促 を 空 に 挿入する）） を 送出 に 巡回した 結果
   x の 送数 + 2 + 回 を 結果にする
 
-促知文 とは 「⚠ モデルが道具を使わずに『できた』と書いたので、道具を使うように頼み直しています…」
+促知文 とは 「⚠ モデルが道具を使わずに、使ったように書いたので、道具を使うように頼み直しています…」
 
-促依頼文 とは 「You wrote that you pushed a branch or opened a pull request, but you did not call any tool, so nothing happened on GitHub. Writing it does not do it. Do it now by calling the tools: github_push (repo, branch, message) pushes the changes of the clone in /work to a new branch, and github_pr (repo, branch, title, body) opens the pull request. If the files are not in /work yet, call github_clone first. Say that it is done only after a tool result says so.」
+# 道具の呼び出しを、呼ばずに文で書いたか(「github_push repo=…」「run "cd …"」など。道具の名前と、引数らしい書き方の両方がある)
+文字列 を 文書呼出にする は 真偽 を 返す
+文 を 文書呼出にする とは （文書道具名群 が （w を 受け取って 文 が w を 含有である を 返すこと） で 一部真である） かつ （文書引数群 が （w を 受け取って 文 が w を 含有である を 返すこと） で 一部真である）
+
+文書道具名群 とは 「github_push」 と 「github_pr」 と 「github_clone」 と 「github_issue」 と 「write_file」 と 「run "」 と 「run '」
+
+文書引数群 とは 「repo=」 と 「repo:」 と 「"repo"」 と 「(repo」 と 「path=」 と 「"path"」 と 「command=」 と 「"command"」 と 「run "」 と 「run '」 と 「branch=」
+
+促依頼文 とは 「You wrote tool calls as text, or wrote that something was done, but you did not call any tool, so nothing happened. Writing a tool call in your answer does not run it. If the user asked you to do it, do it now with real tool calls (for example write_file and run in the sandbox, github_clone, github_push to push the changes of the clone in /work to a new branch, github_pr to open a pull request). Say that it is done only after a tool result says so. If you were only explaining, answer again without the tool calls.」
 
 巡 を （文字列 を 受け取って 数 を 返す 入出力動作 を 返すこと） に 文字列 で 未了知らせする は 数 を 返す 入出力動作
 x を 送出 に 文 で 未了知らせする とは 入出力手順

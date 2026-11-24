@@ -168,6 +168,15 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 
 モデルは clone したファイルを `run` と `write_file` で直して確かめ、`github_push` で `ohanashi/fix-typo` のような新しい枝に push し、`github_pr` で PR を作ります。git はサーバー(手元)で動かすので、コンテナに git や鍵がなくても、コンテナがネットワークにつながっていなくてもできます。commit の名前は鍵の持ち主の名前と `名前@users.noreply.github.com` で、`--git-author "名前 <メール>"` で変えられます。commit の文の終わりにも「— ohanashi-ollama(モデル名) で書きました」を付けます。
 
+#### 頼み方のこつ
+
+小さいモデルは、道具を呼ばずに「push しました」「PR を作りました」と書いたり、呼び出しを文で書いたりしがちです(qwen3-coder-next・qwen3.6:35b で見ました)。サーバーは一度だけ頼み直しますが、次のように頼むのがいちばん確実です。
+
+- 道具の名前・リポジトリ・枝を書く: 「github_push ツールを使って、ohanashi/add-c-hello-world ブランチに push してください」「github_pr ツールを使って、ohanashi/add-c-hello-world ブランチから main ブランチに対して PR を開いてください」
+- clone → 直す → push → PR を、1回に1つずつ頼む
+- 作業ごとに新しい会話にする(長い会話では、前の失敗や作り話に引きずられます)
+- 本当に道具を使ったかは、途中経過の題(「途中経過(道具: github_push)」)か、起動した端末の `[会話 番号] 道具 …` の行で確かめる
+
 #### 鍵の作り方
 
 1. GitHub の [Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) で「Generate new token」を押す
@@ -304,6 +313,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 20. **道具を使わずに「できた」と書いたら、一度だけ頼み直す。** 会話に GitHub のリポジトリがあり、モデルが道具を1回も使わずに PR や push を「した」と書いたら、「書いただけでは何も起きない。github_push・github_pr を呼んで」とモデルに頼み直し、答えを続けてもらいます(画面には「⚠ … 頼み直しています…」と出します)。頼み直しは1回だけで、それでもできていなければ 16・17 の知らせを出します。qwen3-coder-next では、何度か頼むと道具を使ったためです。
 21. **前の答えでできたことは、また書いても知らせない。** 前の答え(画面が道具の印を付けたもの)で `github_push` が push できていた・`github_pr` が PR を作れていたなら、モデルがそれをまた書いても、知らせも頼み直しもしません。
 22. **clone し直せる。** `github_clone` に `fresh: true` を付けると、もうある `/work/名前` を `/work/名前.old-時刻` に移してから clone し直します。`github_pr` が「no history in common」(枝の履歴が base とつながっていない)で断られたときは、clone し直して、変えたファイルを移し、新しい枝に push するようモデルに添えます。コンテナの中で `git init` したフォルダから push した枝は、GitHub の main とつながらず PR を作れなかったためです。
+23. **道具の呼び出しを文で書いたときも頼み直す。** 道具を1回も使わずに、答えに道具の名前(`github_push`・`write_file`・`run "…"` など)と引数らしい書き方(`repo=`・`path=` など)の両方を書いたら、20 と同じように一度だけ頼み直します。頼み直しの文には「説明していただけなら、道具の呼び出しを書かずに答え直して」と添えます。qwen3.6:35b が、道具を呼ぶ代わりに「github_push repo=…, branch=…」と手順を文で書いたためです。
 
 ## 今後の候補
 

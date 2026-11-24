@@ -13,7 +13,7 @@
 #                       道具に github_issue があり、最後の問いが「issue を作って」を含むなら o/r に issue を作る、
 #                       「issue を閉じて」を含むなら o/r の #1 を閉じる道具の呼び出しを返す。
 #                       同じように「clone して」で github_clone、「push して」で ohanashi/test へ、「main に push して」で main へ github_push、
-#                       「PR を作って」で ohanashi/test から github_pr、「PR を作ったと言って」「push したと言って」で道具を使わずにできたと答える(道具を使うよう頼み直されたら、「言い張って」なら、またできたと答える)、「clone し直して」で fresh の github_clone、「つながらない PR」で履歴のつながらない枝の github_pr(偽の GitHub が 422 で断る)、「跡を見て」で前の答えに道具の跡が残っていれば「跡あり」と答える、「git push して」で run の git push(/work/r から ohanashi/test2 へ)、
+#                       「PR を作って」で ohanashi/test から github_pr、「PR を作ったと言って」「push したと言って」で道具を使わずにできたと答える(道具を使うよう頼み直されたら、「言い張って」なら、またできたと答える)、「clone し直して」で fresh の github_clone、「つながらない PR」で履歴のつながらない枝の github_pr(偽の GitHub が 422 で断る)、「道具を文で書いて」で道具を呼ばずに呼び出しを文で書く、「跡を見て」で前の答えに道具の跡が残っていれば「跡あり」と答える、「git push して」で run の git push(/work/r から ohanashi/test2 へ)、
 #                       「空を clone して」「空に push して」で空のリポジトリ o/empty の clone と main への push
 #   GET  /user・/repos/o/r/… … GitHub の API の代わり(--github-api でここを指す)。/user は Authorization が「Bearer 試し鍵」でなければ 401
 #   GET  /repos/o/empty … 空のリポジトリ(枝がない)
@@ -102,6 +102,7 @@ j を 書番にする とは
   そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「main に push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"main","message":"直す"}}}]},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_push"」 を 含有である かつ 内容 が 「push して」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_push","arguments":{"repo":"o/r","branch":"ohanashi/test","message":"README を直す"}}}]},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_pr"」 を 含有である かつ 内容 が 「push したと言」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"🐙 o/r の枝 x に push しました"},"done":false}」
+  そうでなければ もし 内容 が 「道具を文で書いて」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"よし、始めます。\ngithub_push repo=o/r, branch=ohanashi/x, message=\"m\""},"done":false}」
   そうでなければ もし 内容 が 「跡を見て」 を 含有である ならば もし 発言文 が 「🐙 」 を 含有である または 発言文 が 「~~~~」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"跡あり"},"done":false}」 そうでなければ 「{"model":"偽","message":{"role":"assistant","content":"跡なし"},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_pr"」 を 含有である かつ 内容 が 「PR を作ったと言って」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"Pull Request #2 をオープンしました"},"done":false}」
   そうでなければ もし 道具文 が 「"name":"github_pr"」 を 含有である かつ 内容 が 「PR を作って」 を 含有である ならば 「{"model":"偽","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"github_pr","arguments":{"repo":"o/r","branch":"ohanashi/test","title":"README を直す","body":"直しました"}}}]},"done":false}」
