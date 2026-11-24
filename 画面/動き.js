@@ -97,19 +97,44 @@ function いつ(秒) {
   return d.toLocaleDateString("ja-JP", { month: "numeric", day: "numeric" });
 }
 
+// 検索欄に言葉があれば、その言葉を含む会話だけを出す
 async function 一覧読込() {
+  const 語 = 検索欄.value.trim();
   let 群 = [];
-  try { 群 = await API("conversations"); } catch (e) { 知らせる(`会話の一覧を読めませんでした(${e.message})`); }
+  try {
+    群 = 語 ? await API("search", "POST", { q: 語 }) : await API("conversations");
+  } catch (e) { 知らせる(`会話の一覧を読めませんでした(${e.message})`); }
+  if (語 !== 検索欄.value.trim()) return; // 待つ間に言葉が変わった
   const 欄 = $("一覧");
   欄.textContent = "";
+  if (語 && 群.length === 0) {
+    const p = document.createElement("p");
+    p.className = "淡 小字 見つからない";
+    p.textContent = `「${語}」を含む会話はありません`;
+    欄.append(p);
+  }
   for (const c of 群) {
     const 行 = document.createElement("div");
     行.className = "項目" + (今 && 今.id === c.id ? " 今" : "");
     const a = document.createElement("a");
     a.href = `#${c.id}`;
-    a.innerHTML = `<span class="項目題"></span><span class="淡 小字"></span>`;
-    a.firstChild.textContent = c.title || "新しい会話";
-    a.lastChild.textContent = `${いつ(c.updated)} · ${c.model}`;
+    const 題 = document.createElement("span");
+    題.className = "項目題";
+    印付け(題, c.title || "新しい会話", 語);
+    const 下 = document.createElement("span");
+    下.className = "淡 小字";
+    下.textContent = `${いつ(c.updated)} · ${c.model}`;
+    a.append(題, 下);
+    if (語 && c.snippet) {
+      const 抜 = document.createElement("span");
+      抜.className = "抜粋 小字";
+      印付け(抜, 抜粋にする(c.snippet, 語), 語);
+      a.append(抜);
+    }
+    a.addEventListener("click", () => {
+      強調語 = 語;
+      if (今 && 今.id === c.id) { 印消し(); 本文に印付け(); 横欄閉じる(); }
+    });
     const 消 = document.createElement("button");
     消.type = "button";
     消.className = "消す";
@@ -119,6 +144,70 @@ async function 一覧読込() {
     行.append(a, 消);
     欄.append(行);
   }
+}
+
+// --- 検索 ---
+
+const 検索欄 = $("検索");
+let 強調語 = "";   // 検索から開いた会話で、印を付ける言葉
+let 検索予定 = null;
+
+function 検索予約() {
+  clearTimeout(検索予定);
+  検索予定 = setTimeout(一覧読込, 250);
+}
+検索欄.addEventListener("input", (e) => { if (!e.isComposing) 検索予約(); });
+検索欄.addEventListener("compositionend", 検索予約);
+検索欄.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { 検索欄.value = ""; 強調語 = ""; 一覧読込(); 印消し(); }
+  if (e.key === "Enter" && !変換中(e)) { e.preventDefault(); clearTimeout(検索予定); 一覧読込(); }
+});
+検索欄.addEventListener("search", () => { if (!検索欄.value) { 強調語 = ""; 一覧読込(); 印消し(); } });
+
+function 正規逃避(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+// 文の中の 語 に <mark> を付けて el に入れる(大文字小文字は区別しない)
+function 印付け(el, 文, 語) {
+  el.textContent = "";
+  if (!語) { el.textContent = 文; return; }
+  const 部分 = 文.split(new RegExp(`(${正規逃避(語)})`, "i"));
+  部分.forEach((p, i) => {
+    if (i % 2 === 1) { const m = document.createElement("mark"); m.textContent = p; el.append(m); }
+    else if (p) el.append(p);
+  });
+}
+
+// サーバーは見つかった所の前 30 文字から 120 文字を返すので、端を「…」にして改行を詰める
+function 抜粋にする(文, 語) {
+  const 一行 = 文.replace(/\s+/g, " ").trim();
+  const 位置 = 一行.toLowerCase().indexOf(語.toLowerCase());
+  return (位置 > 20 ? "…" + 一行.slice(位置 - 20) : 一行).slice(0, 80) + (一行.length > 80 ? "…" : "");
+}
+
+// 開いた会話の中の 強調語 に印を付け、最初の所まで送る
+function 本文に印付け() {
+  if (!強調語) return;
+  const 正規 = new RegExp(正規逃避(強調語), "i");
+  const 最初 = [];
+  for (const 本 of 会話欄.querySelectorAll(".発言 .本文")) {
+    const 歩 = document.createTreeWalker(本, NodeFilter.SHOW_TEXT);
+    const 節群 = [];
+    while (歩.nextNode()) if (正規.test(歩.currentNode.nodeValue)) 節群.push(歩.currentNode);
+    for (const 節 of 節群) {
+      const 断 = document.createDocumentFragment();
+      const 部分 = 節.nodeValue.split(new RegExp(`(${正規逃避(強調語)})`, "i"));
+      部分.forEach((p, i) => {
+        if (i % 2 === 1) { const m = document.createElement("mark"); m.textContent = p; 断.append(m); 最初.push(m); }
+        else if (p) 断.append(p);
+      });
+      節.replaceWith(断);
+    }
+  }
+  if (最初.length) 最初[0].scrollIntoView({ block: "center" });
+}
+
+function 印消し() {
+  for (const m of 会話欄.querySelectorAll(".本文 mark")) m.replaceWith(m.textContent);
 }
 
 // 1回目で「消す?」になり、もう1回押すと消す
@@ -174,6 +263,7 @@ function 表示し直す() {
   設定欄表示();
   作り直しボタン付け();
   下へ();
+  本文に印付け();
 }
 
 function 下へ() { 会話欄.scrollTop = 会話欄.scrollHeight; }
@@ -268,7 +358,7 @@ $("温度").addEventListener("change", 設定保存);
   document.getSelection().selectAllChildren(題欄);
 });
 題欄.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 題欄.blur(); }
+  if (e.key === "Enter" && !変換中(e)) { e.preventDefault(); 題欄.blur(); }
   if (e.key === "Escape") { 題欄.textContent = 今.title || "新しい会話"; 題欄.blur(); }
 });
 題欄.addEventListener("blur", async () => {
@@ -449,6 +539,16 @@ async function 作り直す() {
 
 // --- 入力欄 ---
 
+// 日本語の変換を確定する Enter では送らない。
+// Chrome は確定の Enter に isComposing を付けるが、Safari は先に compositionend を出してから、
+// isComposing のない keydown(keyCode 229)を出す。ATOK などでは keyCode も 229 にならないことがあるので、
+// compositionend のすぐ後の Enter も確定とみなす。
+let 変換終了時刻 = -1e9;
+for (const 欄 of [文欄, 題欄]) 欄.addEventListener("compositionend", () => { 変換終了時刻 = performance.now(); });
+function 変換中(e) {
+  return e.isComposing || e.keyCode === 229 || performance.now() - 変換終了時刻 < 150;
+}
+
 function 文欄高さ() {
   文欄.style.height = "auto";
   文欄.style.height = Math.min(文欄.scrollHeight, 200) + "px";
@@ -457,7 +557,7 @@ function 文欄高さ() {
 $("入力欄").addEventListener("submit", (e) => { e.preventDefault(); 送る(); });
 文欄.addEventListener("input", 文欄高さ);
 文欄.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); 送る(); }
+  if (e.key === "Enter" && !e.shiftKey && !変換中(e)) { e.preventDefault(); 送る(); }
 });
 止めるボタン.addEventListener("click", () => { if (中断) 中断.abort(); });
 $("新規").addEventListener("click", 新規);

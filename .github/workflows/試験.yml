@@ -63,6 +63,8 @@ jobs:
           [ "$(grep -o '"content":"[^"]*"' 出力/答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: やあ" ]
           curl -s -X POST -d '{"role":"assistant","content":"おうむ返し: やあ"}' $B/api/conversations/1/messages | grep -F '{"role":"assistant","content":"おうむ返し: やあ"}'
           curl -s $B/api/conversations | grep -F '"title":"やあ"'
+          curl -s -X POST -d '{"q":"やあ"}' $B/api/search | grep -F '"snippet":"やあ"'
+          curl -s -X POST -d '{"q":"ない言葉"}' $B/api/search | grep -x '\[\]'
           curl -s -o /dev/null -w '%{http_code}\n' -H 'Origin: http://evil.example' $B/api/conversations | grep -x 403
           curl -s -X PUT -d '{"model":"ない"}' $B/api/conversations/1 > /dev/null
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -F "{\"error\":\"Ollama: model 'ない' not found"
