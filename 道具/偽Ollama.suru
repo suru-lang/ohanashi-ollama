@@ -17,6 +17,7 @@
 #                       「空を clone して」「空に push して」で空のリポジトリ o/empty の clone と main への push
 #   GET  /user・/repos/o/r/… … GitHub の API の代わり(--github-api でここを指す)。/user は Authorization が「Bearer 試し鍵」でなければ 401
 #   GET  /repos/o/empty … 空のリポジトリ(枝がない)
+#   GET  /user/repos … 鍵で使えるリポジトリ o/r・x/y・p/Tools
 #   POST /repos/o/r/issues・PATCH /repos/o/r/issues/1・POST /repos/o/r/pulls … issue #7 を作った・#1 を直した・PR #12 を作った答え。title に、届いた本文の JSON をそのまま入れる
 #   POST /api/web_search … 見出し Authorization が「Bearer 試し鍵」なら、問いを題に入れた2つの結果を返す。違えば 401
 #   GET  /search?q=…&format=json … SearXNG の代わり。符号化したままの q を題に入れた6つの結果を返す。format=json がなければ 403
@@ -163,6 +164,7 @@ HTTP内の要求 を GitHub応答にする は HTTP内の応答 を 返す
   そうでなければ もし 問い の 方法 = 「POST」 かつ 道 = 「/repos/o/r/pulls」 ならば 201 で （「{"number":12,"html_url":"https://github.com/o/r/pull/12","state":"open","title":」 + （（問い の 本文） の JSON文字列 を JSON文字列にする） + 「}」） を HTTP内の状態応答する
   そうでなければ もし 問い の 方法 = 「PATCH」 かつ 道 = 「/repos/o/r/issues/1」 ならば （「{"number":1,"html_url":"https://github.com/o/r/issues/1","state":"closed","title":」 + （（問い の 本文） の JSON文字列 を JSON文字列にする） + 「}」） を HTTP内の本文応答する
   そうでなければ もし 道 = 「/user」 ならば （もし （問い から 「authorization」 を HTTP内の見出し値にする） = 「Bearer 試し鍵」 ならば 「{"login":"試し"}」 を HTTP内の本文応答する そうでなければ 401 で 「{"message":"Bad credentials"}」 を HTTP内の状態応答する）
+  そうでなければ もし 道 = 「/user/repos?sort=updated&per_page=100」 ならば 「[{"full_name":"o/r"},{"full_name":"x/y"},{"full_name":"p/Tools"}]」 を HTTP内の本文応答する
   そうでなければ もし 道 = 「/repos/o/r」 ならば 「{"full_name":"o/r","description":"試しのリポジトリ","default_branch":"main","visibility":"public","topics":["suru"],"has_issues":true,"open_issues_count":1}」 を HTTP内の本文応答する
   そうでなければ もし 道 = 「/repos/o/r/branches?per_page=100」 ならば 「[{"name":"main","protected":false}]」 を HTTP内の本文応答する
   そうでなければ もし 道 = 「/repos/o/empty」 ならば 「{"full_name":"o/empty","default_branch":"main","visibility":"public","size":0}」 を HTTP内の本文応答する
@@ -179,7 +181,7 @@ HTTP内の要求 を 数 で 案内する は 数 を 返す 入出力動作
   もし 問い の 道 = 「/api/chat」 ならば 問い を 接続 で 会話応答する
   そうでなければ もし 問い の 道 が 「/search?」 で 先頭一致である ならば （問い を SearXNG応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/api/web_search」 ならば （問い を 検索応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
-  そうでなければ もし 問い の 道 = 「/user」 または 問い の 道 が 「/repos/」 で 先頭一致である ならば （問い を GitHub応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
+  そうでなければ もし 問い の 道 = 「/user」 または 問い の 道 が 「/user/」 で 先頭一致である または 問い の 道 が 「/repos/」 で 先頭一致である ならば （問い を GitHub応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/api/version」 ならば （「{"version":"0.0.0-偽"}」 を HTTP内の本文応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/api/tags」 ならば （「{"models":[{"name":"偽","size":1},{"name":"偽-考える","size":2}]}」 を HTTP内の本文応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ （404 で 「404 page not found」 を HTTP内の状態応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
