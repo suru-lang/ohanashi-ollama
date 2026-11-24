@@ -120,6 +120,14 @@ jobs:
           docker ps --format '{{.Names}}' | grep -x ohanashi-8092-1
           # 砂場を使わないときは道具を渡さない
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c running | grep -x 0
+          # はじめはネットワークなし。会話の設定でつなぐと、次に砂場を使うときに bridge で作り直す(ファイルは残る)
+          [ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' ohanashi-8092-1)" = none ]
+          curl -s -X PUT -d '{"network":true}' $B/api/conversations/1 | grep -F '"network":true'
+          curl -s $B/api/conversations/1 | grep -F '"network":true'
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat | grep -F '"code":0'
+          [ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' ohanashi-8092-1)" = bridge ]
+          [ -f 出力/作業/1/hello.py ]
+          curl -s -X PUT -d '{"title":"題だけ"}' $B/api/conversations/1 | grep -F '"network":true'
           # 会話を消すとコンテナも消える
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1

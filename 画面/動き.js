@@ -372,7 +372,7 @@ function 作り直しボタン付け() {
   最後.querySelector(".道具").append(b);
 }
 
-// --- 設定(指示と温度) ---
+// --- 設定(指示と温度と砂場のネットワーク) ---
 
 function 設定欄表示() {
   $("指示").value = 今 ? 今.system : 保存値("指示", "");
@@ -381,10 +381,11 @@ function 設定欄表示() {
   $("温度").disabled = 温度 < 0;
   $("温度").value = 温度 < 0 ? 0.8 : 温度;
   $("温度値").textContent = $("温度").value;
+  $("砂場網").checked = 今 ? 今.network : false;
 }
 
 function 設定の値() {
-  return { system: $("指示").value, temperature: $("温度既定").checked ? -1 : Number($("温度").value) };
+  return { system: $("指示").value, temperature: $("温度既定").checked ? -1 : Number($("温度").value), network: $("砂場網").checked };
 }
 
 async function 設定保存() {
@@ -400,6 +401,8 @@ $("指示").addEventListener("change", 設定保存);
 $("温度既定").addEventListener("change", () => { $("温度").disabled = $("温度既定").checked; 設定保存(); });
 $("温度").addEventListener("input", () => { $("温度値").textContent = $("温度").value; });
 $("温度").addEventListener("change", 設定保存);
+// 砂場のネットワークを変えると、次に砂場を使うときにコンテナを作り直す(/work のファイルは残る)
+$("砂場網").addEventListener("change", 設定保存);
 
 // --- 題を変える ---
 
@@ -578,7 +581,7 @@ async function 送る() {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
       今 = await API("conversations", "POST", { model: モデル欄.value });
-      if ($("指示").value || !$("温度既定").checked) 今 = await API(`conversations/${今.id}`, "PUT", 設定の値());
+      if ($("指示").value || !$("温度既定").checked || $("砂場網").checked) 今 = await API(`conversations/${今.id}`, "PUT", 設定の値());
       history.replaceState(null, "", `#${今.id}`);
     }
     文欄.value = "";
@@ -647,6 +650,7 @@ window.addEventListener("hashchange", 道から開く);
       砂場ボタン.disabled = false;
       砂場ボタン.title = "押してあると、モデルが砂場(Docker のコンテナ)でコードを書いて動かします";
       砂場切替(保存値("砂場", "") === "1");
+      $("砂場網欄").hidden = false;
     }
     if (i.web) {
       ウェブボタン.disabled = false;

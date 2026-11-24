@@ -8,8 +8,8 @@
 「SQLite」 を 読み込んで 使う
 「時間」 を 読み込む
 
-# 温度が負なら、モデルの既定の温度を使う
-会話 とは 番号 と 題 と モデル と 指示 と 温度 の 組
+# 温度が負なら、モデルの既定の温度を使う。網 が 1 なら、砂場のコンテナを外のネットワークにつなぐ(pip・apt を使える)
+会話 とは 番号 と 題 と モデル と 指示 と 温度 と 網 の 組
 発言 とは 役 と 内容 の 組
 
 # --- 開く・閉じる ---
@@ -25,10 +25,13 @@
 道 を 帳準備する とは 道 を 表作成すること で 帳使用する
 
 SQLite接続 を 表作成する は 数 を 返す 入出力動作
-db を 表作成する とは
+db を 表作成する とは 入出力手順
   db に 表の文 を SQLite実行する
+  # 前の版で作った表には 網 の列がないので足す(もうあれば失敗するので、その失敗は捨てる)
+  （db に 「ALTER TABLE 会話 ADD COLUMN 網 INTEGER NOT NULL DEFAULT 0」 を SQLite実行する） を 試行する
+  0 を 結果にする
 ただし 表の文 とは 「PRAGMA journal_mode = WAL;」
-    + 「CREATE TABLE IF NOT EXISTS 会話 (番号 INTEGER PRIMARY KEY, 題 TEXT NOT NULL, モデル TEXT NOT NULL, 指示 TEXT NOT NULL DEFAULT '', 温度 REAL NOT NULL DEFAULT -1, 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
+    + 「CREATE TABLE IF NOT EXISTS 会話 (番号 INTEGER PRIMARY KEY, 題 TEXT NOT NULL, モデル TEXT NOT NULL, 指示 TEXT NOT NULL DEFAULT '', 温度 REAL NOT NULL DEFAULT -1, 網 INTEGER NOT NULL DEFAULT 0, 作成 REAL NOT NULL, 更新 REAL NOT NULL);」
     + 「CREATE TABLE IF NOT EXISTS 発言 (番号 INTEGER PRIMARY KEY, 会話 INTEGER NOT NULL REFERENCES 会話(番号) ON DELETE CASCADE, 役 TEXT NOT NULL, 内容 TEXT NOT NULL, 作成 REAL NOT NULL);」
     + 「CREATE INDEX IF NOT EXISTS 発言_会話 ON 発言 (会話, 番号);」
 
@@ -84,13 +87,13 @@ SQL値 の リスト を 検索項目にする は JSON を 返す
 # 番号の会話(なければ 無)
 SQLite接続 から 数 を 会話取得する は 会話 の 有無 を 返す 入出力動作
 db から 番号 を 会話取得する とは 入出力手順
-  行群 とは db に 「SELECT 番号, 題, モデル, 指示, 温度 FROM 会話 WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
+  行群 とは db に 「SELECT 番号, 題, モデル, 指示, 温度, 網 FROM 会話 WHERE 番号 = ?」 を （（番号 の SQL数） を 空 に 挿入する） で SQLite差込問合した 結果
   行群 を 会話行にして 結果にする
 
 SQL値 の リスト の リスト を 会話行にする は 会話 の 有無 を 返す
 空 を 会話行にする とは 無
 （先頭 は 行 で 残り は 他） を 会話行にする とは
-  （番号 は （行 から 1 を 番目取得して 値数にする） で 題 は （行 から 2 を 番目取得して 値文字列にする） で モデル は （行 から 3 を 番目取得して 値文字列にする） で 指示 は （行 から 4 を 番目取得して 値文字列にする） で 温度 は （行 から 5 を 番目取得して 値数にする） の 会話） の 有
+  （番号 は （行 から 1 を 番目取得して 値数にする） で 題 は （行 から 2 を 番目取得して 値文字列にする） で モデル は （行 から 3 を 番目取得して 値文字列にする） で 指示 は （行 から 4 を 番目取得して 値文字列にする） で 温度 は （行 から 5 を 番目取得して 値数にする） で 網 は （行 から 6 を 番目取得して 値数にする） の 会話） の 有
 
 # 会話の発言(古い順)
 SQLite接続 から 数 を 発言一覧取得する は 発言 の リスト を 返す 入出力動作
@@ -101,10 +104,10 @@ db から 番号 を 発言一覧取得する とは 入出力手順
 SQL値 の リスト を 発言行にする は 発言 を 返す
 行 を 発言行にする とは 役 は （行 の 先頭 を 値文字列にする） で 内容 は （行 の 最後 を 値文字列にする） の 発言
 
-# 題・モデル・指示・温度を書きかえる
+# 題・モデル・指示・温度・網を書きかえる
 SQLite接続 に 会話 を 会話更新する は 数 を 返す 入出力動作
 db に c を 会話更新する とは
-  db に 「UPDATE 会話 SET 題 = ?, モデル = ?, 指示 = ?, 温度 = ? WHERE 番号 = ?」 を （（c の 題 の SQL文字列） と （c の モデル の SQL文字列） と （c の 指示 の SQL文字列） と （c の 温度 の SQL数） と （c の 番号 の SQL数）） で SQLite差込実行する
+  db に 「UPDATE 会話 SET 題 = ?, モデル = ?, 指示 = ?, 温度 = ?, 網 = ? WHERE 番号 = ?」 を （（c の 題 の SQL文字列） と （c の モデル の SQL文字列） と （c の 指示 の SQL文字列） と （c の 温度 の SQL数） と （c の 網 の SQL数） と （c の 番号 の SQL数）） で SQLite差込実行する
 
 # 会話を消す(発言も消える)。消した数を結果にする
 SQLite接続 から 数 を 会話削除する は 数 を 返す 入出力動作
@@ -131,9 +134,9 @@ db から 番号 を 最後答え削除する とは
 m を 発言JSONにする とは
   （（「role」 と （m の 役 の JSON文字列） の JSON項目） と （「content」 と （m の 内容 の JSON文字列） の JSON項目）） の JSON物
 
-# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"messages":[…]}
+# 会話の中身: {"id":…,"title":…,"model":…,"system":…,"temperature":…,"network":真偽,"messages":[…]}
 会話 を 発言 の リスト で 会話JSONにする は JSON を 返す
 c を 発言群 で 会話JSONにする とは
-  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「messages」 と （（発言群 の それぞれ を 発言JSONにする） の JSON配列） の JSON項目）） の JSON物
+  （（「id」 と （c の 番号 の JSON数） の JSON項目） と （「title」 と （c の 題 の JSON文字列） の JSON項目） と （「model」 と （c の モデル の JSON文字列） の JSON項目） と （「system」 と （c の 指示 の JSON文字列） の JSON項目） と （「temperature」 と （c の 温度 の JSON数） の JSON項目） と （「network」 と （（c の 網 = 1） の JSON真偽） の JSON項目） と （「messages」 と （（発言群 の それぞれ を 発言JSONにする） の JSON配列） の JSON項目）） の JSON物
 
 値文字列にする と 値数にする と 型逃避する と 検索項目にする と 一覧項目にする と 会話行にする と 発言行にする は 非公開とする
