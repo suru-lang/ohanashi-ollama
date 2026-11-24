@@ -13,7 +13,7 @@
 - 最後の答えを「作り直す」、失敗したら「もう一度」
 - 答えの速さ(トークン/秒)を出します
 - 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
-- 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます
+- 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます。読み書きのリポジトリには、頼めば issue を作る・直す・コメントする・閉じることもできます
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -139,7 +139,21 @@ GITHUB_TOKEN=github_pat_… kumu 実行 -- --github-repos suru-lang/suru,suru-la
 
 画面には「🐙 o/r の README.md を読みました(2 行)」のように、何を読んだかだけを出します。読んだ中身はモデルにだけ渡し、答えといっしょには保存しません。
 
-鍵は fine-grained の個人アクセストークンで、読むリポジトリに Metadata・Contents・Issues・Pull requests の読みの権限を付けてください。「読み書き」はまだ選んで覚えるだけで、書く道具(issue やコメントを書く)はこれから足します。
+鍵は fine-grained の個人アクセストークンで、読むリポジトリに Metadata・Contents・Issues・Pull requests の読みの権限を付けてください。
+
+### GitHub の issue を書く
+
+会話の「読み書き」のリポジトリがあると、モデルに道具 `github_issue` も渡します。`action` で次のことをします。
+
+- `create`: issue を作る(題・本文・ラベル)
+- `update`: issue・PR の題・本文・ラベルを変える
+- `comment`: issue・PR にコメントする
+- `close`: issue を閉じる(完了か予定なし)
+- `reopen`: 閉じた issue を開く
+
+画面で確かめずに行います。書いたら「🐙 o/r に issue [#7](…) を作りました: 題」のように、リンクの1行を答えに残します。書いた本文とコメントの終わりには「— ohanashi-ollama(モデル名) で書きました」を付けます。「読むだけ」のリポジトリに書こうとしたときは、書かずにモデルへ理由を返します。
+
+書くリポジトリの鍵には、Issues と Pull requests の読み書きの権限が要ります。
 
 **注意:** 今の する は、すべてのネットワークの口(0.0.0.0)で待ち受けます。同じネットワークのほかの機械からも画面を開けて、会話を読めます。信用できないネットワークでは、ファイアウォールでポートを閉じてください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
@@ -159,7 +173,7 @@ OLLAMA_API_KEY=試し鍵 kumu 実行 -- --ollama http://localhost:11435 --web-se
 kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435   # SearXNG で試す
 ```
 
-偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
+偽の Ollama は、最後の発言に「おうむ返し: 」を付けて1文字ずつ返します。モデル「偽-考える」は先に考えを流し、「書式」を含む問いには Markdown の見本を返します。`/api/web_search` は、キーが `試し鍵` なら問いを題に入れた2つの結果を返し、`/search?q=…&format=json` は SearXNG のふりをして6つの結果を返します。検索の結果を受け取ったモデルは答えの終わりに「 [検索あり]」を付けます。GitHub の道具を渡されて「GitHub」を含む問いを受けると `o/r` の `README.md` を読み、「issue を作って」なら `o/r` に issue を作り、「issue を閉じて」なら `o/r` の #1 を閉じます。偽の Ollama は GitHub の API のふりもします(`--github-api http://localhost:11435`、鍵は `試し鍵`)。GitHub Actions では、これを相手に curl と Node の WebSocket で確かめています([.github/workflows/試験.yml](.github/workflows/試験.yml))。
 
 ## 作り
 
@@ -170,7 +184,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [Ollama.suru](Ollama.suru) | Ollama の API(`/api/chat`・`/api/tags`・`/api/version`)とのやりとり |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
-| [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む)と、会話のリポジトリの許し |
+| [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む、issue を書く)と、会話のリポジトリの許し |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
 | [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換) |
@@ -244,9 +258,13 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 1. **API は suru-lang/github で。** GitHub の API を使うところは、ほかのアプリでも使えるように [suru-lang/github](https://github.com/suru-lang/github) に分けました。このアプリには、モデルの道具と、会話のリポジトリの許しだけを置きます。
 2. **リポジトリは2重に絞る。** 起動の `--github-repos` で足してよいものを決め、会話ごとに使うものを足します。サーバーは会話を保存するときに `--github-repos` に合わないものを除き、道具を行うときにも、会話にないリポジトリなら断ってモデルに理由を返します。英字の大文字小文字は区別しません。
 3. **Read と Write は会話ごと・リポジトリごと。** Claude のように、会話にリポジトリを足すときに「読むだけ」か「読み書き」を選びます。会話帳の `倉` の列に `[{"repo":…,"write":真偽}]` の JSON でしまいます(前の版の表には、起動したときに `ALTER TABLE` で足します)。
-4. **読むのは確かめずに行う。** 読む道具は、画面で確かめずに行います。書く道具は「読み書き」のリポジトリにだけ渡す予定です。issue を消す道具は作らず、閉じる(`not_planned`)で足ります。
+4. **読むのは確かめずに行う。** 読む道具は、画面で確かめずに行います。
 5. **中身は保存しない。** 読んだファイルや issue は長く、リポジトリはあとで変わるので、モデルに渡すだけにします。画面には何を読んだかの1行だけを出し、それを答えといっしょに保存します。
 6. **鍵は出さない。** 鍵は起動の記録にも画面にも出しません。`/api/info` は、鍵の持ち主の名前(`githubUser`)だけを返します。
+7. **書くのも確かめずに行う。** 確かめずに書いてよいかは、リポジトリを足すときの「読み書き」で決めます。書くたびに画面で「やる・やめる」を聞く仕組みは作りませんでした。書く道具 `github_issue` は、読み書きのリポジトリが1つでもあるときだけ渡し、行うときにもそのリポジトリが読み書きかを確かめます。
+8. **書く道具は1つ。** issue の作る・直す・コメント・閉じる・開くを、`action` で選ぶ1つの道具にしました。道具が多いと、小さいモデルが迷うためです。
+9. **issue は消さない。** 消す道具は作らず、閉じる(`not_planned`)で足ります。GitHub でも、issue を消せるのはリポジトリの管理者だけです。
+10. **書いたことがわかるようにする。** 書いた本文とコメントの終わりに「— ohanashi-ollama(モデル名) で書きました」を付けます(もう付いていれば付けません)。GitHub では鍵の持ち主が書いたことになるので、読む人がモデルの書いたものと見分けられるようにしました。
 
 ## 今後の候補
 

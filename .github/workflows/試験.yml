@@ -133,6 +133,33 @@ jobs:
           if grep -F '違う鍵' 出力/アプリ6.log; then exit 1; fi
           curl -s http://127.0.0.1:8098/api/info | grep -F '"github":true,"githubRepos":["o/r"],"githubUser":""'
           kill $A $F
+      - name: 偽の GitHub を相手に、読み書きのリポジトリに issue を書く
+        run: |
+          ./出力/偽Ollama 11439 > 出力/偽Ollama7.log 2>&1 &
+          F=$!
+          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11439 --db 出力/GitHub書.db --port 8099 --github-api http://127.0.0.1:11439 --github-repos o/r,p/* > 出力/アプリ7.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8099/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8099
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations > /dev/null
+          # 読むだけの o/r には書かない(書く道具は、読み書きの p/tools のために渡している)
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r"},{"repo":"p/tools","write":true}]}' $B/api/conversations/1 > /dev/null
+          curl -s -X POST -d '{"role":"user","content":"GitHub に issue を作って"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"github":true}' $B/api/chat | tee 出力/書答え1
+          grep -F '{"running":"🐙 o/r に issue を作っています"}' 出力/書答え1
+          grep -F '"summary":"🐙 書けませんでした: o/r は、この会話では読むだけです。' 出力/書答え1
+          # 読み書きなら書く。本文の終わりに、書いたモデルを付ける
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r","write":true}]}' $B/api/conversations/1 > /dev/null
+          curl -s -X POST -d '{"conversation":1,"github":true}' $B/api/chat | tee 出力/書答え2
+          grep -F '{"tool":{"name":"github_issue","summary":"🐙 o/r に issue [#7](https://github.com/o/r/issues/7) を作りました: 試しの issue"}}' 出力/書答え2
+          grep -o '"content":"[^"]*"' 出力/書答え2 | sed 's/"content":"//; s/"$//' | tr -d '\n' > 出力/書答え2.文
+          grep -F 'created #7: https://github.com/o/r/issues/7' 出力/書答え2.文
+          # 偽の GitHub は届いた本文を title に入れて返す(「"」は上の取り出しで消える)
+          grep -F 'title\:\試しの issue\,\body\:\動きません\\n\\n— ohanashi-ollama(偽) で書きました\,\labels\:[\bug\]' 出力/書答え2.文
+          curl -s -X POST -d '{"role":"user","content":"GitHub の issue を閉じて"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"github":true}' $B/api/chat | tee 出力/書答え3
+          grep -F '{"tool":{"name":"github_issue","summary":"🐙 o/r の [#1](https://github.com/o/r/issues/1) を閉じました(予定なし)"}}' 出力/書答え3
+          kill $A $F
       - name: 砂場(Docker)でコードを動かす(Linux)
         # macOS の GitHub の機械には Docker がないので Linux だけで。偽の Ollama は「コード」を含む問いに、hello.py を書いて動かす道具を呼ぶ
         if: runner.os == 'Linux'

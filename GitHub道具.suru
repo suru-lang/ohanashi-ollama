@@ -3,10 +3,11 @@
 #   v を 許可 で 倉文にする                … 画面から届いた repos の JSON を、しまう文字列(許してあるものだけ)にする
 #   文 を 許可 で 倉群読取する             … しまってある文字列を 倉許可 のリストにする(許してあるものだけ)
 #   s を 窓口作成する                      … 設定の鍵と基点の GitHub の窓口
-#   道具定義                              … モデルに渡す道具(github_repo・github_tree・github_file・github_issues)の JSON のリスト
+#   倉群 を 道具定義作成する              … モデルに渡す道具の JSON のリスト(読む道具4つと、読み書きのリポジトリがあれば github_issue)
 #   名 が GitHub道具名である               … github_ で始まる道具か
-#   w で 倉群 に 呼出 を GitHub道具実行する … 道具の呼び出し1つを行い、砂場内の道具結果 にする
+#   w で 倉群 に 呼出 を 署名 から GitHub道具実行する … 道具の呼び出し1つを行い、砂場内の道具結果 にする(署名は書いた本文の終わりに付ける名前)
 #   呼出 を 呼出説明にする                 … 画面に「読んでいます」と出す短い文
+#   本文 に 署名 を 署名付加する          … 書いた本文の終わりに「— 署名 で書きました」を付ける
 #   倉群 を GitHub案内にする               … モデルに渡す、使えるリポジトリと道具の使い方の指示(system)
 # 鍵は窓口の中だけにあり、モデル・画面・砂場には渡しません。
 
@@ -91,9 +92,19 @@ s を 窓口作成する とは s の GitHub鍵 を GitHub窓口にして s の 
 
 道具定義文 とは 「[{"type":"function","function":{"name":"github_repo","description":"Read the settings of a GitHub repository: description, default branch, visibility, topics, labels, and whether you may write to it in this conversation.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"}},"required":["repo"]}}},{"type":"function","function":{"name":"github_tree","description":"List the files of a GitHub repository (recursively). Use path to list only under a folder.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"ref":{"type":"string","description":"Branch, tag or commit. Empty for the default branch"},"path":{"type":"string","description":"Only list files under this folder"}},"required":["repo"]}}},{"type":"function","function":{"name":"github_file","description":"Read a text file in a GitHub repository. Long files are cut.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"path":{"type":"string","description":"The file path, like src/main.py"},"ref":{"type":"string","description":"Branch, tag or commit. Empty for the default branch"}},"required":["repo","path"]}}},{"type":"function","function":{"name":"github_issues","description":"Read issues or pull requests of a GitHub repository. Without number, lists them. With number, reads one with its comments.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"kind":{"type":"string","enum":["issue","pr"],"description":"issue (default) or pr"},"number":{"type":"integer","description":"The issue or pull request number"},"state":{"type":"string","enum":["open","closed","all"],"description":"For the list. Default open"}},"required":["repo"]}}}]」
 
-道具定義 とは もし （道具定義文 を JSON解析する） が
+書道具定義文 とは 「[{"type":"function","function":{"name":"github_issue","description":"Write to issues and pull requests of a GitHub repository that is read and write in this conversation. action create: make an issue (title, body, labels). update: change an issue or pull request (number, and any of title, body, labels). comment: add a comment to an issue or pull request (number, body). close: close an issue (number, reason). reopen: open a closed issue (number). Write only when the user asks you to.","parameters":{"type":"object","properties":{"repo":{"type":"string","description":"owner/name"},"action":{"type":"string","enum":["create","update","comment","close","reopen"]},"number":{"type":"integer","description":"The issue or pull request number (not for create)"},"title":{"type":"string"},"body":{"type":"string","description":"Markdown"},"labels":{"type":"array","items":{"type":"string"},"description":"Label names. For update, this replaces all labels"},"reason":{"type":"string","enum":["completed","not_planned"],"description":"For close. Default completed"}},"required":["repo","action"]}}}]」
+
+文字列 を 定義群にする は JSON の リスト を 返す
+文 を 定義群にする とは もし （文 を JSON解析する） が
   群 という 成功 ならば 群 を 要素群にする
   そうでなければ 空
+
+# 読む道具はいつも、書く道具は読み書きのリポジトリがあるときだけ渡す
+倉許可 の リスト を 道具定義作成する は JSON の リスト を 返す
+倉群 を 道具定義作成する とは （道具定義文 を 定義群にする） + （もし 倉群 が 書ける倉であること で 一部真である ならば 書道具定義文 を 定義群にする そうでなければ 空）
+
+倉許可 が 書ける倉である は 真偽 を 返す
+x が 書ける倉である とは x の 書込
 
 文字列 が GitHub道具名である は 真偽 を 返す
 名 が GitHub道具名である とは 名 が 「github_」 で 先頭一致である
@@ -136,10 +147,22 @@ JSON を 呼出説明にする は 文字列 を 返す
   そうでなければ もし 名 = 「github_tree」 ならば 「🐙 」 + 倉 + 「 のファイルの一覧を読んでいます」
   そうでなければ もし 名 = 「github_file」 ならば 「🐙 」 + 倉 + 「 の 」 + （呼出 から 「path」 を 引数文にする） + 「 を読んでいます」
   そうでなければ もし 名 = 「github_issues」 ならば 「🐙 」 + 倉 + 「 の 」 + 種類語 + 「を読んでいます」
+  そうでなければ もし 名 = 「github_issue」 ならば 「🐙 」 + 倉 + （呼出 を 書説明にする）
   そうでなければ 「🐙 」 + 名
 ただし 名 とは 呼出 を 呼出名にする
 ただし 倉 とは 呼出 から 「repo」 を 引数文にする
 ただし 種類語 とは もし （呼出 から 「kind」 を 引数文にする） = 「pr」 ならば 「PR 」 そうでなければ 「issue 」
+
+JSON を 書説明にする は 文字列 を 返す
+呼出 を 書説明にする とは
+  もし 動 = 「create」 ならば 「 に issue を作っています」
+  そうでなければ もし 動 = 「update」 ならば 「 の 」 + 番 + 「 を直しています」
+  そうでなければ もし 動 = 「comment」 ならば 「 の 」 + 番 + 「 にコメントしています」
+  そうでなければ もし 動 = 「close」 ならば 「 の 」 + 番 + 「 を閉じています」
+  そうでなければ もし 動 = 「reopen」 ならば 「 の 」 + 番 + 「 を開いています」
+  そうでなければ 「 に書いています」
+ただし 動 とは 呼出 から 「action」 を 引数文にする
+ただし 番 とは 「#」 + （呼出 から 「number」 を 引数文にする）
 
 # --- 道具を行う ---
 
@@ -149,6 +172,9 @@ JSON を 呼出説明にする は 文字列 を 返す
 
 文字列 で 文字列 を 失敗結果にする は 砂場内の道具結果 を 返す
 名 で 理由 を 失敗結果にする とは 名 で （「🐙 読めませんでした: 」 + 理由） を （「失敗しました: 」 + 理由） から 道具結果にする
+
+文字列 で 文字列 を 書失敗結果にする は 砂場内の道具結果 を 返す
+名 で 理由 を 書失敗結果にする とは 名 で （「🐙 書けませんでした: 」 + 理由） を （「失敗しました: 」 + 理由） から 道具結果にする
 
 # 倉 がこの会話のリポジトリにあれば、その 倉許可(大文字小文字はこの会話の書き方にそろえる)
 倉許可 の リスト から 文字列 を 倉探索する は 倉許可 の 有無 を 返す
@@ -161,23 +187,24 @@ JSON を 呼出説明にする は 文字列 を 返す
 倉許可 を 倉名にする は 文字列 を 返す
 x を 倉名にする とは x の 倉
 
-GitHub窓口 で 倉許可 の リスト に JSON を GitHub道具実行する は 砂場内の道具結果 を 返す 入出力動作
-w で 倉群 に 呼出 を GitHub道具実行する とは
+GitHub窓口 で 倉許可 の リスト に JSON を 文字列 から GitHub道具実行する は 砂場内の道具結果 を 返す 入出力動作
+w で 倉群 に 呼出 を 署名 から GitHub道具実行する とは
   もし 名 が GitHub道具名でない ならば （名 で （「知らない道具です: 」 + 名） を 失敗結果にする） を 結果にする
   そうでなければ もし 先 が
-    x という 有 ならば w で x に 呼出 を 名 より 倉道具実行する
+    x という 有 ならば w で x に 呼出 を 名 より 署名 から 倉道具実行する
     そうでなければ （名 で （「『」 + 指定 + 「』は、この会話では使えません。使えるのは 」 + （倉群 を 倉一覧文にする） + 「 です」） を 失敗結果にする） を 結果にする
 ただし 名 とは 呼出 を 呼出名にする
 ただし 指定 とは 呼出 から 「repo」 を 引数文にする
 # repo を省いても、会話のリポジトリが1つならそれを使う
 ただし 先 とは もし 指定 = 「」 かつ 倉群 の 長さ = 1 ならば 倉群 の 先頭 の 有 そうでなければ 倉群 から 指定 を 倉探索する
 
-GitHub窓口 で 倉許可 に JSON を 文字列 より 倉道具実行する は 砂場内の道具結果 を 返す 入出力動作
-w で x に 呼出 を 名 より 倉道具実行する とは
+GitHub窓口 で 倉許可 に JSON を 文字列 より 文字列 から 倉道具実行する は 砂場内の道具結果 を 返す 入出力動作
+w で x に 呼出 を 名 より 署名 から 倉道具実行する とは
   もし 名 = 「github_repo」 ならば w で x を 設定道具実行する
   そうでなければ もし 名 = 「github_tree」 ならば w で x に （呼出 から 「ref」 を 引数文にする） を （呼出 から 「path」 を 引数文にする） から 木道具実行する
   そうでなければ もし 名 = 「github_file」 ならば w で x に （呼出 から 「path」 を 引数文にする） を （呼出 から 「ref」 を 引数文にする） から ファイル道具実行する
   そうでなければ もし 名 = 「github_issues」 ならば w で x に 呼出 を issue道具実行する
+  そうでなければ もし 名 = 「github_issue」 ならば w で x に 呼出 を 署名 から 書込道具実行する
   そうでなければ （名 で （「知らない道具です: 」 + 名） を 失敗結果にする） を 結果にする
 
 # 成否を道具結果にする(失敗なら理由をモデルと画面に返す)
@@ -308,12 +335,124 @@ w で x に 種類 を 番号 から 一件読取する とは 入出力手順
 JSON を コメント文にする は 文字列 を 返す
 v を コメント文にする とは 改行 + 改行 + 「--- comment by 」 + （（v から 「user」 を JSON取得する） から 「login」 を GitHub文字値取得する） + 「 at 」 + （v から 「created_at」 を GitHub文字値取得する） + 改行 + （（v から 「body」 を GitHub文字値取得する） を 2000 で 文短縮する）
 
+# --- github_issue(書く) ---
+
+# 読むだけのリポジトリには書かない(道具を渡していても、ほかの読み書きのリポジトリのために渡している)
+GitHub窓口 で 倉許可 に JSON を 文字列 から 書込道具実行する は 砂場内の道具結果 を 返す 入出力動作
+w で x に 呼出 を 署名 から 書込道具実行する とは
+  もし x の 書込 ならば w で x に 呼出 を 署名 から issue書込する
+  そうでなければ （「github_issue」 で （x の 倉 + 「 は、この会話では読むだけです。書くには、利用者に ⚙ の設定で『読み書き』にしてもらってください」） を 書失敗結果にする） を 結果にする
+
+GitHub窓口 で 倉許可 に JSON を 文字列 から issue書込する は 砂場内の道具結果 を 返す 入出力動作
+w で x に 呼出 を 署名 から issue書込する とは 入出力手順
+  r とは w で x に 呼出 を 署名 から issue書込選択した 結果
+  （r を 書結果確定する） を 結果にする
+
+（砂場内の道具結果 と 文字列） の 成否 を 書結果確定する は 砂場内の道具結果 を 返す
+（k という 成功） を 書結果確定する とは k
+（e という 失敗） を 書結果確定する とは 「github_issue」 で e を 書失敗結果にする
+
+GitHub窓口 で 倉許可 に JSON を 文字列 から issue書込選択する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 呼出 を 署名 から issue書込選択する とは
+  もし 動 = 「create」 ならば w で x に 呼出 を 署名 から issue作成実行する
+  そうでなければ もし 動 ≠ 「update」 かつ 動 ≠ 「comment」 かつ 動 ≠ 「close」 かつ 動 ≠ 「reopen」 ならば （「action は create・update・comment・close・reopen のどれかです(届いたのは『」 + 動 + 「』)」） の 失敗 を 結果にする
+  そうでなければ もし 番号 <= 0 ならば （「action が 」 + 動 + 「 のときは、number(issue か PR の番号)が要ります」） の 失敗 を 結果にする
+  そうでなければ もし 動 = 「update」 ならば w で x に 呼出 を 署名 から issue更新実行する
+  そうでなければ もし 動 = 「comment」 ならば w で x に 呼出 を 署名 から コメント実行する
+  そうでなければ もし 動 = 「close」 ならば w で x に 番号 を （呼出 から 「reason」 を 引数文にする） から 閉鎖実行する
+  そうでなければ w で x を 番号 から 再開実行する
+ただし 動 とは 呼出 から 「action」 を 引数文にする
+ただし 番号 とは （呼出 を 呼出引数にする） から 「number」 を JSON取得して 数値取得する
+
+# 書いた本文の終わりに「— ohanashi-ollama(モデル)で書きました」を付ける(もう付いていれば付けない)
+文字列 に 文字列 を 署名付加する は 文字列 を 返す
+本文 に 署名 を 署名付加する とは
+  もし 署名 = 「」 または 本文 が 尾 で 末尾一致である ならば 本文
+  そうでなければ もし 本文 = 「」 ならば 尾
+  そうでなければ 本文 + 改行 + 改行 + 尾
+ただし 尾 とは 「— 」 + 署名 + 「 で書きました」
+
+# labels は文字列のリストか、「,」で区切った文字列
+JSON を 札群取得する は 文字列 の リスト を 返す
+（群 という JSON配列） を 札群取得する とは （群 の それぞれ を 札文字にする） から 有字であること で 選別する
+（s という JSON文字列） を 札群取得する とは （（s を 「,」 で 分割する） の それぞれ を 空白除去する） から 有字であること で 選別する
+v を 札群取得する とは 空
+
+JSON を 札文字にする は 文字列 を 返す
+v を 札文字にする とは v を 文字値取得して 空白除去する
+
+JSON が 札指定である は 真偽 を 返す
+（群 という JSON配列） が 札指定である とは 真
+（s という JSON文字列） が 札指定である とは 真
+v が 札指定である とは 偽
+
+文字列 を 文字JSON化する は JSON を 返す
+s を 文字JSON化する とは s の JSON文字列
+
+# 作った・直したものの URL を、画面の1行(Markdown のリンク)とモデルへの答えに入れる
+JSON を 番号リンクにする は 文字列 を 返す
+v を 番号リンクにする とは 「[#」 + （v から 「number」 を GitHub数値取得して 文字列化する） + 「](」 + （v から 「html_url」 を GitHub文字値取得する） + 「)」
+
+文字列 で JSON を 書答文にする は 文字列 を 返す
+動 で v を 書答文にする とは 動 + 「 #」 + （v から 「number」 を GitHub数値取得して 文字列化する） + 「: 」 + （v から 「html_url」 を GitHub文字値取得する） + 改行 + 「title: 」 + （v から 「title」 を GitHub文字値取得する） + 改行 + 「state: 」 + （v から 「state」 を GitHub文字値取得する）
+
+GitHub窓口 で 倉許可 に JSON を 文字列 から issue作成実行する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 呼出 を 署名 から issue作成実行する とは 入出力手順
+  題文 とは 呼出 から 「title」 を 引数文にする
+  案 とは 題 は 題文 で 本文 は （（呼出 から 「body」 を 引数文にする） に 署名 を 署名付加する） で ラベル群 は （（呼出 を 呼出引数にする） から 「labels」 を JSON取得して 札群取得する） で 担当群 は 空 の GitHubIssue案
+  v とは w で x の 倉 に 案 を GitHubIssue作成した 中身
+  （「github_issue」 で （「🐙 」 + x の 倉 + 「 に issue 」 + （v を 番号リンクにする） + 「 を作りました: 」 + 題文） を （「created」 で v を 書答文にする） から 道具結果にする） の 成功 を 結果にする
+
+GitHub窓口 で 倉許可 に JSON を 文字列 から issue更新実行する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 呼出 を 署名 から issue更新実行する とは
+  もし 項目群 が 空 ならば 「update では、変えるもの(title・body・labels)を1つ以上書いてください」 の 失敗 を 結果にする
+  そうでなければ w で x に 番号 を 項目群 から 更新送信する
+ただし 番号 とは （呼出 を 呼出引数にする） から 「number」 を JSON取得して 数値取得する
+ただし 題文 とは 呼出 から 「title」 を 引数文にする
+ただし 本文 とは 呼出 から 「body」 を 引数文にする
+ただし 札 とは （呼出 を 呼出引数にする） から 「labels」 を JSON取得する
+ただし 項目群 とは （もし 題文 = 「」 ならば 空 そうでなければ （「title」 と （題文 の JSON文字列） の JSON項目） を 空 に 挿入する） + （もし 本文 = 「」 ならば 空 そうでなければ （「body」 と （（本文 に 署名 を 署名付加する） の JSON文字列） の JSON項目） を 空 に 挿入する） + （もし 札 が 札指定である ならば （「labels」 と （（（札 を 札群取得する） の それぞれ を 文字JSON化する） の JSON配列） の JSON項目） を 空 に 挿入する そうでなければ 空）
+
+GitHub窓口 で 倉許可 に 数 を JSON項目 の リスト から 更新送信する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 番号 を 項目群 から 更新送信する とは 入出力手順
+  v とは w で x の 倉 に 番号 を 項目群 から GitHubIssue更新した 中身
+  （「github_issue」 で （「🐙 」 + x の 倉 + 「 の 」 + （v を 番号リンクにする） + 「 を直しました(」 + （（項目群 の それぞれ を 項目名取得する） を 「・」 で 結合する） + 「)」） を （「updated」 で v を 書答文にする） から 道具結果にする） の 成功 を 結果にする
+
+JSON項目 を 項目名取得する は 文字列 を 返す
+x を 項目名取得する とは x の 項目名
+
+GitHub窓口 で 倉許可 に JSON を 文字列 から コメント実行する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 呼出 を 署名 から コメント実行する とは
+  もし 本文 = 「」 ならば 「comment では、body(コメントの本文)が要ります」 の 失敗 を 結果にする
+  そうでなければ w で x に 番号 を （本文 に 署名 を 署名付加する） から コメント送信する
+ただし 番号 とは （呼出 を 呼出引数にする） から 「number」 を JSON取得して 数値取得する
+ただし 本文 とは 呼出 から 「body」 を 引数文にする
+
+GitHub窓口 で 倉許可 に 数 を 文字列 から コメント送信する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 番号 を 本文 から コメント送信する とは 入出力手順
+  v とは w で x の 倉 に 番号 を 本文 から GitHubコメント作成した 中身
+  所 とは v から 「html_url」 を GitHub文字値取得する
+  （「github_issue」 で （「🐙 」 + x の 倉 + 「 の #」 + （番号 を 文字列化する） + 「 に[コメント](」 + 所 + 「)しました」） を （「commented on #」 + （番号 を 文字列化する） + 「: 」 + 所） から 道具結果にする） の 成功 を 結果にする
+
+GitHub窓口 で 倉許可 に 数 を 文字列 から 閉鎖実行する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x に 番号 を 指定 から 閉鎖実行する とは 入出力手順
+  理由 とは もし 指定 = 「not_planned」 ならば 「not_planned」 そうでなければ 「completed」
+  v とは w で x の 倉 に 番号 を 理由 から GitHubIssue閉鎖した 中身
+  語 とは もし 理由 = 「not_planned」 ならば 「予定なし」 そうでなければ 「完了」
+  （「github_issue」 で （「🐙 」 + x の 倉 + 「 の 」 + （v を 番号リンクにする） + 「 を閉じました(」 + 語 + 「)」） を （（「closed as 」 + 理由） で v を 書答文にする） から 道具結果にする） の 成功 を 結果にする
+
+GitHub窓口 で 倉許可 を 数 から 再開実行する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
+w で x を 番号 から 再開実行する とは 入出力手順
+  v とは w で x の 倉 に 番号 を GitHubIssue再開した 中身
+  （「github_issue」 で （「🐙 」 + x の 倉 + 「 の 」 + （v を 番号リンクにする） + 「 を開きました」） を （「reopened」 で v を 書答文にする） から 道具結果にする） の 成功 を 結果にする
+
 # --- モデルへの指示 ---
 
 倉許可 の リスト を GitHub案内にする は 文字列 を 返す
-群 を GitHub案内にする とは 「あなたは、道具 github_repo・github_tree・github_file・github_issues で、GitHub のリポジトリを読めます。この会話で使えるリポジトリは次のとおりです(ほかは使えません)。」 + 改行 + （（群 の それぞれ を 案内行にする） を 改行 で 結合する） + 改行 + 「リポジトリのことを聞かれたら、推測せずに道具で読んで確かめてから答えてください。」
+群 を GitHub案内にする とは 「あなたは、道具 github_repo・github_tree・github_file・github_issues で、GitHub のリポジトリを読めます。この会話で使えるリポジトリは次のとおりです(ほかは使えません)。」 + 改行 + （（群 の それぞれ を 案内行にする） を 改行 で 結合する） + 改行 + 「リポジトリのことを聞かれたら、推測せずに道具で読んで確かめてから答えてください。」 + 書案内
+ただし 書案内 とは もし 群 が 書ける倉であること で 一部真である ならば 改行 + 「『読み書き』のリポジトリには、道具 github_issue で issue を作る・直す・コメントする・閉じる・開くことができます。利用者に頼まれたときだけ書き、書いたら URL を答えに入れてください。『読むだけ』のリポジトリには書けません。」 そうでなければ 「」
 
 倉許可 を 案内行にする は 文字列 を 返す
 x を 案内行にする とは 「- 」 + x の 倉 + （もし x の 書込 ならば 「(読み書き)」 そうでなければ 「(読むだけ)」）
 
-許可項合致である と 倉の形である と 名前部分である と 名前字である と 要素群にする と 真偽値にする と 倉許可にする と 重複除去する と 倉項JSONにする と 道具定義文 と 文字値取得する と 数値取得する と 引数物にする と 呼出名にする と 呼出引数にする と 引数文にする と 道具結果にする と 失敗結果にする と 倉探索する と 倉一覧文にする と 倉名にする と 倉道具実行する と 結果確定する と 設定道具実行する と 設定読取する と 設定文にする と 英真偽にする と 札名にする と 木道具実行する と 木読取する と 木行にする と 斜線整理する と ファイル道具実行する と ファイル読取する と 行数にする と 文短縮する と issue道具実行する と issue選択読取する と 一覧取得選択する と 一件取得選択する と 一覧読取する と 一覧行にする と 一件読取する と コメント文にする と 案内行にする と 中身上限 と 木上限 と 一覧上限 と 本文上限 と コメント上限 は 非公開とする
+許可項合致である と 倉の形である と 名前部分である と 名前字である と 要素群にする と 真偽値にする と 倉許可にする と 重複除去する と 倉項JSONにする と 道具定義文 と 文字値取得する と 数値取得する と 引数物にする と 呼出名にする と 呼出引数にする と 引数文にする と 道具結果にする と 失敗結果にする と 倉探索する と 倉一覧文にする と 倉名にする と 倉道具実行する と 結果確定する と 設定道具実行する と 設定読取する と 設定文にする と 英真偽にする と 札名にする と 木道具実行する と 木読取する と 木行にする と 斜線整理する と ファイル道具実行する と ファイル読取する と 行数にする と 文短縮する と issue道具実行する と issue選択読取する と 一覧取得選択する と 一件取得選択する と 一覧読取する と 一覧行にする と 一件読取する と コメント文にする と 案内行にする と 中身上限 と 木上限 と 一覧上限 と 本文上限 と コメント上限 と 書道具定義文 と 定義群にする と 書説明にする と 書失敗結果にする と 書込道具実行する と issue書込する と 書結果確定する と issue書込選択する と 札群取得する と 札文字にする と 札指定である と 文字JSON化する と 番号リンクにする と 書答文にする と issue作成実行する と issue更新実行する と 更新送信する と 項目名取得する と コメント実行する と コメント送信する と 閉鎖実行する と 再開実行する は 非公開とする
