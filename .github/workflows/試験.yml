@@ -98,6 +98,41 @@ jobs:
             };'
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           kill %1 %2
+      - name: 偽の GitHub を相手に、会話のリポジトリを読む
+        run: |
+          ./出力/偽Ollama 11436 > 出力/偽Ollama5.log 2>&1 &
+          F=$!
+          GITHUB_TOKEN=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11436 --db 出力/GitHub.db --port 8093 --github-api http://127.0.0.1:11436 --github-repos o/r,p/* > 出力/アプリ5.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8093/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8093
+          grep -F 'GitHub: 試し としてつながりました。使えるリポジトリ: o/r,p/*' 出力/アプリ5.log
+          if grep -F '試し鍵' 出力/アプリ5.log; then exit 1; fi
+          curl -s $B/api/info | grep -F '"github":true,"githubRepos":["o/r","p/*"],"githubUser":"試し"'
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"repos":[]'
+          # 許していないリポジトリ(x/y)は残らない。大文字小文字は書いたまま
+          curl -s -X PUT -d '{"repos":[{"repo":"o/r"},{"repo":"x/y","write":true},{"repo":"p/Tools","write":true}]}' $B/api/conversations/1 | grep -F '"repos":[{"repo":"o/r","write":false},{"repo":"p/Tools","write":true}]'
+          curl -s -X POST -d '{"role":"user","content":"GitHub の README を読んで"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"github":true}' $B/api/chat | tee 出力/GitHub答え
+          grep -F '{"running":"🐙 o/r の README.md を読んでいます"}' 出力/GitHub答え
+          grep -F '{"tool":{"name":"github_file","summary":"🐙 o/r の README.md を読みました(2 行)"}}' 出力/GitHub答え
+          # 読んだ中身がモデルに返り、もう一度答える(偽の Ollama は道具の結果をおうむ返しする)
+          [ "$(grep -o '"content":"[^"]*"' 出力/GitHub答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = '読みます。おうむ返し: # 試し\nこんにちは\n' ]
+          # 🐙 を押していなければ道具を渡さない
+          curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c running | grep -x 0
+          # リポジトリのない会話では知らせる
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations > /dev/null
+          curl -s -X POST -d '{"role":"user","content":"GitHub"}' $B/api/conversations/2/messages > /dev/null
+          curl -s -X POST -d '{"conversation":2,"github":true}' $B/api/chat | grep -F '{"notice":"この会話には GitHub のリポジトリがありません。⚙ の設定で足してください"}'
+          kill $A
+          # 鍵が違えば、起動のときに知らせる(鍵は出さない)
+          GITHUB_TOKEN=違う鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11436 --db 出力/GitHub.db --port 8098 --github-api http://127.0.0.1:11436 --github-repos o/r > 出力/アプリ6.log 2>&1 &
+          A=$!
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8098/ && break; sleep 0.2; done
+          grep -F '注意: GitHub の鍵を確かめられませんでした(GitHub の鍵が違うか、期限が切れています(401): Bad credentials)。' 出力/アプリ6.log
+          if grep -F '違う鍵' 出力/アプリ6.log; then exit 1; fi
+          curl -s http://127.0.0.1:8098/api/info | grep -F '"github":true,"githubRepos":["o/r"],"githubUser":""'
+          kill $A $F
       - name: 砂場(Docker)でコードを動かす(Linux)
         # macOS の GitHub の機械には Docker がないので Linux だけで。偽の Ollama は「コード」を含む問いに、hello.py を書いて動かす道具を呼ぶ
         if: runner.os == 'Linux'

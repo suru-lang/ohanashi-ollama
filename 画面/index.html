@@ -36,6 +36,20 @@
       <label class="並び">温度 <input id="温度" type="range" min="0" max="2" step="0.1" value="0.8" disabled> <output id="温度値">0.8</output></label>
     </div>
     <label class="並び" id="砂場網欄" hidden><input id="砂場網" type="checkbox"> 💻 砂場からインターネットにつなぐ(pip install・apt-get install を使えるようにする)</label>
+    <div id="倉欄" hidden>
+      <span class="欄名">🐙 GitHub のリポジトリ(この会話で読むもの)</span>
+      <ul id="倉一覧"></ul>
+      <div class="行 倉追加">
+        <input id="倉名" list="倉候補" placeholder="owner/名前" aria-label="足すリポジトリ" autocomplete="off">
+        <datalist id="倉候補"></datalist>
+        <select id="倉権限" aria-label="権限">
+          <option value="read">Read(読むだけ)</option>
+          <option value="write">Write(書いてもよい)</option>
+        </select>
+        <button id="倉足す" type="button" class="小">足す</button>
+      </div>
+      <span id="倉案内" class="淡 小字"></span>
+    </div>
     <div class="行" id="更新欄" hidden>
       <button id="再起動" type="button" class="小">🔄 最新にして再起動</button>
       <span id="更新状態" class="淡 小字"></span>
@@ -53,6 +67,7 @@
     <textarea id="文" rows="1" placeholder="メッセージを書く" autofocus></textarea>
     <button id="ウェブ" type="button" class="切替" aria-label="ウェブで調べる" aria-pressed="false" disabled title="起動するときに SEARXNG_URL か OLLAMA_API_KEY を設定すると、ウェブで調べてから答えます">🌐<span class="字"> ウェブ</span></button>
     <button id="砂場" type="button" class="切替" aria-label="砂場でコードを動かす" aria-pressed="false" disabled title="Docker が使えると、モデルが砂場(コンテナ)でコードを書いて動かします">💻<span class="字"> 砂場</span></button>
+    <button id="GitHub" type="button" class="切替" aria-label="GitHub を読む" aria-pressed="false" disabled title="起動するときに --github-repos を付けると、会話のリポジトリをモデルが読みます">🐙<span class="字"> GitHub</span></button>
     <button id="送る" type="submit" class="主">送る</button>
     <button id="止める" type="button" hidden>止める</button>
   </form>
