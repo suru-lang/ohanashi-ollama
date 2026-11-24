@@ -173,6 +173,11 @@ select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-
 .発言.待ち .道具 { visibility: hidden; }
 .失敗 { align-self: flex-start; color: var(--誤); border: 1px solid var(--誤); border-radius: 14px; padding: 8px 14px; max-width: 88%; overflow-wrap: anywhere; }
 .失敗 button { margin-left: 8px; padding: 2px 10px; }
+/* スレッドが長くなった知らせと、まとめの欄 */
+.長さ知らせ, .まとめ欄 { align-self: stretch; border: 1px solid var(--線); background: var(--面); border-radius: 14px; padding: 10px 14px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 8px; }
+.長さ知らせ.超え { border-color: var(--誤); }
+.長さ知らせ .行, .まとめ欄 .行 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.まとめ欄 textarea { width: 100%; min-height: 8em; font: inherit; padding: 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); color: inherit; resize: vertical; box-sizing: border-box; }
 
 /* 途中経過(考えと道具を使った跡)。はじめは畳んでおき、押すと開く */
 .途中 { margin-bottom: 6px; font-size: 0.85rem; color: var(--淡); }

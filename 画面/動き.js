@@ -341,7 +341,7 @@ function 会話題表示() {
 }
 
 function 表示し直す() {
-  会話欄.querySelectorAll(".発言, .失敗").forEach((el) => el.remove());
+  会話欄.querySelectorAll(".発言, .失敗, .長さ知らせ, .まとめ欄").forEach((el) => el.remove());
   const 群 = 筋 ? 筋.messages : [];
   $("ようこそ").hidden = !!群.length;
   会話題表示();
@@ -614,9 +614,11 @@ async function 設定保存() {
 
 // 答え(途中経過を除く)を会話のメモの終わりに足して保存し、⚙ を開いて見せる
 async function メモに足す(el) {
-  if (!今) return;
-  const 文 = 途中を分ける(el.dataset.内容 || "").答え.trim();
-  if (!文) return;
+  await メモに文を足す(途中を分ける(el.dataset.内容 || "").答え.trim());
+}
+
+async function メモに文を足す(文) {
+  if (!今 || !文) return;
   const 前 = $("メモ").value.trim();
   $("メモ").value = (前 ? 前 + "\n\n" : "") + 文;
   メモ字数表示();
@@ -788,6 +790,7 @@ async function 答えてもらう() {
     if (統計 && 統計.seconds > 0) 印.textContent = `${統計.tokens} トークン · ${(統計.tokens / 統計.seconds).toFixed(1)} トークン/秒`;
     if (止めた) 印.textContent = "止めました";
     el.querySelector(".道具").append(印);
+    if (統計 && 統計.prompt) 長さを知らせる(番号, 統計.prompt);
   } else {
     el.remove();
   }
@@ -797,6 +800,91 @@ async function 答えてもらう() {
   await 会話読み直す();
   一覧読込();
   文欄.focus();
+}
+
+// --- スレッドが長くなったら、まとめて新しいスレッドへ ---
+// Ollama が答えの終わりに返す、送った文のトークンの数(stats.prompt)で、スレッドの長さを見る。
+// モデルの文脈の長さはまだ分からないので、多くのモデルで使える 8192 を目安にする
+
+const 文脈目安 = 8192;
+
+function 長さを知らせる(番号, 送った) {
+  if (!筋 || 筋.id !== 番号 || 送った < 文脈目安 / 2) return;
+  const 超え = 送った >= 文脈目安;
+  if (!超え && 保存値(`長さ知らせ済:${番号}`, "") === "1") return; // 閉じたら、そのスレッドでは出さない(超えたときは出す)
+  会話欄.querySelectorAll(".長さ知らせ").forEach((x) => x.remove());
+  const el = document.createElement("div");
+  el.className = "長さ知らせ" + (超え ? " 超え" : "");
+  const 文 = document.createElement("div");
+  文.textContent = 超え
+    ? `送った文が約 ${送った} トークンになり、モデルの文脈(多くは ${文脈目安})を超えているかもしれません。前の発言の一部が読まれていないおそれがあります。まとめて新しいスレッドで続けてください。`
+    : `このスレッドは長くなりました(送った文 約 ${送った} トークン)。新しいスレッドにすると速くなり、前の話に引きずられにくくなります。`;
+  const 行 = document.createElement("div");
+  行.className = "行";
+  const ボタン = (字, 動き) => { const b = document.createElement("button"); b.type = "button"; b.className = "小"; b.textContent = 字; b.addEventListener("click", 動き); 行.append(b); return b; };
+  ボタン("📝 まとめて新しいスレッドへ", () => { el.remove(); まとめる(); });
+  ボタン("＋ 新しいスレッドへ", () => { el.remove(); 新スレッド(); });
+  ボタン("閉じる", () => { el.remove(); 保存する(`長さ知らせ済:${番号}`, "1"); });
+  el.append(文, 行);
+  会話欄.append(el);
+  下へ();
+}
+
+// モデルにスレッドをまとめてもらい、直してから、新しいスレッドの頭に置くか、メモに足して新しいスレッドへ移る
+async function まとめる() {
+  if (!筋 || 中断) return;
+  const 元 = 筋, 元題 = 筋題(筋);
+  会話欄.querySelectorAll(".まとめ欄").forEach((x) => x.remove());
+  const el = document.createElement("div");
+  el.className = "まとめ欄";
+  const 見出し = document.createElement("div");
+  見出し.textContent = "📝 このスレッドをまとめています…";
+  const 欄 = document.createElement("textarea");
+  欄.setAttribute("aria-label", "スレッドのまとめ");
+  欄.readOnly = true;
+  const 行 = document.createElement("div");
+  行.className = "行";
+  const ボタン = (字, 動き) => { const b = document.createElement("button"); b.type = "button"; b.className = "小"; b.textContent = 字; b.disabled = true; b.addEventListener("click", 動き); 行.append(b); return b; };
+  const 頭 = ボタン("新しいスレッドの頭に置く", async () => {
+    const 文 = 欄.value.trim();
+    if (!文) return;
+    el.remove();
+    try {
+      筋 = await API(`conversations/${今.id}/threads`, "POST", { title: `${元題} の続き` });
+      筋 = await API(`threads/${筋.id}/messages`, "POST", { role: "user", content: `前のスレッド「${元題}」のまとめです。この続きを話します。\n\n${文}` });
+      今 = await API(`conversations/${今.id}`);
+    } catch (e) { 知らせる(`新しいスレッドを作れませんでした(${e.message})`); return; }
+    history.pushState(null, "", 道を作る(今.id, 筋.id));
+    表示し直す(); 一覧読込(); 文欄.focus();
+  });
+  const 留 = ボタン("メモに足して新しいスレッドへ", async () => {
+    const 文 = 欄.value.trim();
+    if (!文) return;
+    el.remove();
+    await メモに文を足す(`(「${元題}」のまとめ)\n${文}`);
+    if ($("メモ").value.length <= メモ上限) await 新スレッド();
+  });
+  const 止 = ボタン("やめる", () => { if (中断) 中断.abort(); el.remove(); });
+  止.disabled = false;
+  el.append(見出し, 欄, 行);
+  会話欄.append(el);
+  下へ();
+  中断 = new AbortController();
+  送受中にする(true);
+  let 文 = "", 誤り = "";
+  try {
+    await 聞く(JSON.stringify({ thread: 元.id, summary: true }), (通知) => {
+      if (通知.content) { 文 += 通知.content.replace(/\u2063/g, ""); 欄.value = 文; 欄.scrollTop = 欄.scrollHeight; }
+      if (通知.error) 誤り = 通知.error;
+    }, 中断.signal);
+  } catch (e) { if (e.name !== "AbortError") 誤り = String(e.message || e); }
+  中断 = null;
+  送受中にする(false);
+  if (!el.isConnected) return;
+  欄.readOnly = false;
+  見出し.textContent = 誤り ? `まとめられませんでした: ${誤り}` : "📝 このスレッドのまとめです。直してから選んでください(このスレッドには残りません)";
+  頭.disabled = 留.disabled = !文.trim();
+  欄.focus();
 }
 
 // 失敗の知らせ。答えがなかったら「もう一度」で同じ問いを聞き直せる
