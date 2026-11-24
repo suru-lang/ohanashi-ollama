@@ -168,6 +168,15 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 
 モデルは clone したファイルを `run` と `write_file` で直して確かめ、`github_push` で `ohanashi/fix-typo` のような新しい枝に push し、`github_pr` で PR を作ります。git はサーバー(手元)で動かすので、コンテナに git や鍵がなくても、コンテナがネットワークにつながっていなくてもできます。commit の名前は鍵の持ち主の名前と `名前@users.noreply.github.com` で、`--git-author "名前 <メール>"` で変えられます。commit の文の終わりにも「— ohanashi-ollama(モデル名) で書きました」を付けます。
 
+#### 頼み方のこつ
+
+小さいモデルは、道具を呼ばずに「push しました」「PR を作りました」と書いたり、呼び出しを文で書いたりしがちです(qwen3-coder-next・qwen3.6:35b で見ました)。サーバーは一度だけ頼み直しますが、次のように頼むのがいちばん確実です。
+
+- 道具の名前・リポジトリ・枝を書く: 「github_push ツールを使って、ohanashi/add-c-hello-world ブランチに push してください」「github_pr ツールを使って、ohanashi/add-c-hello-world ブランチから main ブランチに対して PR を開いてください」
+- clone → 直す → push → PR を、1回に1つずつ頼む
+- 作業ごとに新しい会話にする(長い会話では、前の失敗や作り話に引きずられます)
+- 本当に道具を使ったかは、途中経過の題(「途中経過(道具: github_push)」)か、起動した端末の `[会話 番号] 道具 …` の行で確かめる
+
 #### 鍵の作り方
 
 1. GitHub の [Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) で「Generate new token」を押す
