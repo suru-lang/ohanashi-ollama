@@ -32,5 +32,25 @@ for (const [入, 期待] of 例) {
     console.log(`✗ ${JSON.stringify(入)}\n    期待: ${期待}\n    実際: ${実際}`);
   }
 }
-console.log(`合格 ${例.length - 不合格}・不合格 ${不合格}`);
+// 途中経過(道具を使った跡)と最後の答えを分ける
+const 途中を分ける = window.途中を分ける;
+const 走 = "\n\n~~~~console\n$ ls\na.py\n~~~~\n\n";
+const 書 = "\n\n📝 `a.py`(書きました)\n\n~~~~python\nprint(1)\n~~~~\n\n";
+const 分け例 = [
+  ["ただの答え", { 途中: "", 答え: "ただの答え", 手順: 0 }],
+  ["```\n~~~~\n```\n答え", { 途中: "", 答え: "```\n~~~~\n```\n答え", 手順: 0 }],
+  ["見ます" + 走 + "書きます" + 書 + "できました", { 途中: "見ます\n\n~~~~console\n$ ls\na.py\n~~~~\n\n書きます\n\n📝 `a.py`(書きました)\n\n~~~~python\nprint(1)\n~~~~", 答え: "できました", 手順: 2 }],
+  ["\n\n🐙 o/r の README.md を読みました(2 行)\n\n読みました", { 途中: "🐙 o/r の README.md を読みました(2 行)", 答え: "読みました", 手順: 1 }],
+  // 道具の後に答えがまだない(止めた・届いている途中)
+  ["動かします" + 走, { 途中: "動かします\n\n~~~~console\n$ ls\na.py\n~~~~", 答え: "", 手順: 1 }],
+];
+for (const [入, 期待] of 分け例) {
+  const 実際 = 途中を分ける(入);
+  if (JSON.stringify(実際) !== JSON.stringify(期待)) {
+    不合格++;
+    console.log(`✗ 途中を分ける ${JSON.stringify(入)}\n    期待: ${JSON.stringify(期待)}\n    実際: ${JSON.stringify(実際)}`);
+  }
+}
+
+console.log(`合格 ${例.length + 分け例.length - 不合格}・不合格 ${不合格}`);
 process.exit(不合格 ? 1 : 0);
