@@ -157,6 +157,7 @@ select { max-width: 40%; padding: 5px 8px; border: 1px solid var(--線); border-
 #決まり内容 { width: 100%; min-height: 10em; font-family: ui-monospace, monospace; font-size: 0.85rem; resize: vertical; }
 #決まり数 { margin-left: 2px; }
 #知らせ { padding: 8px 16px; font-size: 0.9rem; }
+#知らせ.案内 { background: var(--面); color: var(--淡); border-bottom: 1px solid var(--線); }
 #知らせ.誤り { background: color-mix(in srgb, var(--誤) 12%, var(--面)); color: var(--誤); }
 
 #会話 {
@@ -269,6 +270,10 @@ textarea {
 .添付.誤り .様子 { color: var(--誤); }
 .添付 .外す { position: absolute; top: 4px; right: 4px; padding: 0 6px; border: none; background: none; line-height: 1.4; }
 .添付注意 { flex-basis: 100%; }
+.添付注意.見えない { color: var(--誤); }
+.添付注意 button.リンク { padding: 0; border: none; background: none; color: var(--主, inherit); text-decoration: underline; font: inherit; cursor: pointer; }
+.添付 .頁印 { display: flex; align-items: center; gap: 4px; color: var(--字); cursor: pointer; white-space: normal; }
+.添付 .頁印 input { margin: 0; }
 #落とし覆い {
   position: fixed;
   inset: 0;

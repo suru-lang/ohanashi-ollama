@@ -103,8 +103,8 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 
 画面にファイルを落とすか、入力欄に貼るか(Ctrl+V・⌘V)、入力欄の左の 📎 で選ぶと、入力欄の上に並びます。✕ で外せます。書いて送ると、問いといっしょに送ります(添えるだけで、書かずに送ることもできます)。
 
-- **画像**(PNG・JPEG・WebP・GIF など、ブラウザが読めるもの)は、長い辺 1600px までに縮めて JPEG(透明があれば PNG)にしてから送ります。1つの問いに 8 枚まで。読めるのは、画像を扱えるモデル(`ollama pull qwen2.5vl` や `gemma3` など)だけです。画像を扱えないモデルでは、Ollama が断るか、画像を見ずに答えます
-- **PDF** は、ブラウザでページごとに文を取り出して(「--- 3 ページ ---」で区切る)送ります。20MB まで。スキャンした PDF のように文字のないページは、札に「2 ページは文字がありません」と出ます(そのページは読めません)
+- **画像**(PNG・JPEG・WebP・GIF など、ブラウザが読めるもの)は、長い辺 1600px までに縮めて JPEG(透明があれば PNG)にしてから送ります。1つの問いに 8 枚まで。読めるのは、画像を扱えるモデル(`ollama pull qwen2.5vl` や `gemma3` など)だけです。モデルの一覧では、画像を読めるモデルに 👁 が付きます。画像を読めないモデルの会話で画像を添えると、送るボタンを押せなくなり、画像を読めるモデルの名前が出ます(押すと、その会話のモデルが変わります)
+- **PDF** は、ブラウザでページごとに文を取り出して(「--- 3 ページ ---」で区切る)送ります。20MB まで。スキャンした PDF のように文字のないページは、札に「🖼 2 ページは文字がありません。画像にして送る」と出て、印が付いていればそのページを画像にして「報告.pdf の 2 ページ」として添えます(画像と合わせて 8 枚まで。印を外すと文だけ送ります)
 - **文字のファイル**(`.txt`・`.md`・`.csv`・`.json`・コードなど)は、そのまま送ります。5MB まで
 - 添える文は、1つの問いで合わせて 10 万字まで。8000 字を超えると、モデルの文脈に入りきらないかもしれないと知らせます
 
@@ -230,6 +230,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許し・決まりのまとめ方の試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
 node 道具/道試験.js          # 画面の道(#会話/スレッド)の試験
+node 道具/頁試験.js          # PDF の文字のないページを画像にするところの試験
 ```
 
 本物の LLM の代わりに、決まった答えを返す偽の Ollama([道具/偽Ollama.suru](道具/偽Ollama.suru))で、全部を動かして確かめられます。
@@ -257,7 +258,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
-| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道、`添付.js` は画像・PDF を添えるところ) |
+| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道、`添付.js` は画像・PDF を添えるところ、`頁.js` は PDF をページごとに読むところ) |
 | [画面/外/pdfjs/](画面/外/pdfjs/) | PDF の文を取り出す [pdf.js](https://github.com/mozilla/pdf.js)(pdfjs-dist 4.10.38 の `legacy/build/pdf.min.mjs`・`pdf.worker.min.mjs` と `cmaps/`。Apache-2.0、[LICENSE](画面/外/pdfjs/LICENSE)) |
 
 依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)と [suru-lang/ollama](https://github.com/suru-lang/ollama)(Ollama の API)です。
@@ -268,7 +269,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 |---|---|
 | `GET /api/github/repos` | 会話に足すリポジトリの候補(鍵で使えるもの。`--github-repos` があればそれに入るものだけ) `{"repos":[…]}` |
 | `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"github":真偽,"githubRepos":[…],"githubUser":…}` |
-| `GET /api/models` | 入っているモデルの名前 `{"models":[…]}` |
+| `GET /api/models` | 入っているモデルの名前と能力 `{"models":[…],"catalog":[{"name":…,"capabilities":["completion","vision",…]},…]}` |
 | `GET /api/conversations` | 会話の一覧(新しく話した順。`"threads"` はスレッドの数) |
 | `POST /api/search` | 題か発言に言葉を含むスレッド `{"q":…}` → `[{"id":会話,"thread":スレッド,"title":…,"threadTitle":…,"snippet":…}, …]` |
 | `POST /api/conversations` | 会話を1つ目のスレッドといっしょに作る `{"model":…,"rules":[決まりの番号, …]}`(`rules` を省くと、既定の印の決まりを付ける) |
@@ -414,13 +415,16 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 6. **一覧には目録だけ。** スレッドの中身の発言には添付の目録(番号・種類・名前・ページの数・字数)だけを付け、画像の中身はモデルに送るときだけ読みます。
 7. **大きさに上限。** 画像は1つの問いに 8 枚・1 つ base64 で 1400 万字(元で 10MB ほど)まで、添える文は合わせて 10 万字まで、要求の本文は 30MB までです。画面でも先に断ります。
 8. **画像は Ollama のライブラリで送る。** suru-lang/ollama 0.2.0 の `Ollama画像追加する` で、発言に `images` を付けます。
+9. **文字のないページは画面で画像にする。** pdf.js でページを描いて(長い辺 1600px・白地の JPEG)、普通の画像の添付として送ります。サーバーは変えません。画像にしたページは、`<file>` の中を「(このページは画像で添えます)」にします。はじめから印を付けておき、上限(画像と合わせて 8 枚)を超えたら、はじめのページから画像にします。文のあるページを選んで画像にすることは、まだできません。
+10. **画像を読めるかは Ollama の `/api/show` で。** `capabilities` に `vision` がなければ読めないモデルとします。`/api/models` を開くたびと、答えを作るたびに聞きます(モデル帳 #26 ができたら、帳を使います)。`capabilities` がない古い Ollama や、聞けなかったときは止めません。
+11. **読めないモデルに画像を送らない。** 最後の問いに画像があれば、サーバーも Ollama へ送る前に断ります。前の問いの画像は外して、内容の前に「(画像: 猫.jpg)」と書き添えて送ります(画像があったことはモデルに分かるように)。画面は、前の画像のあるスレッドで読めないモデルに変えると「前の画像は読まれません」と知らせます。
 
 ## 今後の候補
 
 - 画面のファイルを実行ファイルに入れて、どのフォルダからでも起動できるようにする
 - ウェブ検索: 言葉をモデルに作らせる(道具の呼び出し)、ページを読む `/api/web_fetch`、SearXNG の言語・カテゴリを選ぶ
 - 会話を Markdown・JSON に書き出す
-- 添付: 文字のない PDF のページを画像にして見えるモデルに渡す(#50)、画像を読めないモデルのときは送る前に知らせる(#51)
+- 添付: 文のある PDF のページも選んで画像にする(図の多いページ)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける
 - 砂場: 作業フォルダのファイルを画面で見る・落とす、コマンドを動かす前に確かめる、コンテナを手元の利用者で動かす
 - 長い会話を、モデルの文脈の長さ(`num_ctx`)に合わせて切り詰める
