@@ -32,6 +32,8 @@ let 中断 = null;        // 答えを受け取っている間の AbortControlle
 let 接続 = null;        // 開いている WebSocket
 let WebSocket可 = true; // つなげなかったら、fetch に切り替える
 let モデル群 = [];
+let 見えるモデル群 = [];   // 画像を読めるモデル(/api/models の catalog の capabilities に vision がある)
+let 見えないモデル群 = new Set(); // 画像を読めないと分かっているモデル(capabilities が空なら分からないので入れない)
 let 新規倉 = [];        // まだ会話を作っていないときに ⚙ で足したリポジトリ
 let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)。空ならどれでも足せる
 let 倉案内文 = "";
@@ -75,6 +77,9 @@ async function モデル読込() {
   try {
     const j = await API("models");
     モデル群 = j.models;
+    const 目録 = j.catalog || [];
+    見えるモデル群 = 目録.filter((m) => m.capabilities.includes("vision")).map((m) => m.name);
+    見えないモデル群 = new Set(目録.filter((m) => m.capabilities.length && !m.capabilities.includes("vision")).map((m) => m.name));
     if (モデル群.length === 0) 知らせる("Ollama にモデルがありません。ターミナルで「ollama pull llama3.2」のように入れてから、読み込み直してください。");
     else 知らせる("");
   } catch (e) {
@@ -97,17 +102,27 @@ function モデル欄表示() {
   for (const 名 of 名群) {
     const o = document.createElement("option");
     o.value = 名;
-    o.textContent = モデル群.includes(名) ? 名 : `${名}(ありません)`;
+    o.textContent = (モデル群.includes(名) ? 名 : `${名}(ありません)`) + (見えるモデル群.includes(名) ? " 👁" : "");
     モデル欄.append(o);
   }
   モデル欄.value = 選ぶ;
   モデル欄.disabled = 名群.length === 0;
+  if (typeof 添付欄表示 === "function") 添付欄表示();
 }
 
-モデル欄.addEventListener("change", async () => {
-  保存する("モデル", モデル欄.value);
-  if (今) 今 = await API(`conversations/${今.id}`, "PUT", { model: モデル欄.value });
-});
+function 画像を読めない(名) { return 見えないモデル群.has(名); }
+
+// 会話のモデルを変える(📎 の知らせの「見えるモデル」を押したときにも使う)
+async function モデルを変える(名) {
+  モデル欄.value = 名;
+  保存する("モデル", 名);
+  添付欄表示();
+  if (今) 今 = await API(`conversations/${今.id}`, "PUT", { model: 名 });
+  const 前の画像 = 筋 && 筋.messages.some((m) => (m.attachments || []).some((a) => a.kind === "image"));
+  if (前の画像 && 画像を読めない(名)) 知らせる(`${名} は画像を読めません。このスレッドの前の画像は読まれません(名前だけが伝わります)。`, "案内");
+}
+
+モデル欄.addEventListener("change", () => モデルを変える(モデル欄.value).catch((e) => 知らせる(`モデルを変えられませんでした(${e.message})`)));
 
 // --- 会話の一覧 ---
 
@@ -1061,6 +1076,7 @@ async function 送る() {
   if ((!質問 && !添付待ち.length) || 中断) return;
   let 添付;
   try { 添付 = 送る添付(); } catch (e) { 知らせる(e.message); return; }
+  if (画像を送るか() && 画像を読めない(モデル欄.value)) { 知らせる(`${モデル欄.value} は画像を読めません。画像を読めるモデルに変えるか、画像を外してください。`); return; }
   try {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
