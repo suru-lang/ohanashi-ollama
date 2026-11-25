@@ -38,7 +38,12 @@ let 新規倉 = [];        // まだ会話を作っていないときに ⚙ で
 let 許可倉 = [];        // サーバーが許しているリポジトリ(--github-repos)。空ならどれでも足せる
 let 倉案内文 = "";
 let 決まり群 = [];      // しまってある決まりの一覧 [{id, name, default, length, uses}]
-let 新規決まり = null;  // まだ会話を作っていないときに ⚙ で選んだ決まりの番号(null なら既定の決まり)
+let 新規決まり = null;  // まだ会話を作っていないときに ⚙ で選んだ決まりの番号(null なら既定の決まりと、モードの場面の決まり)
+let 帳 = [];            // モデル帳(/api/models の catalog)。大きさ・能力と、調べた特徴・点数
+let おすすめ = {};      // モードごとのおすすめ {会話: {name, reason}, コーディング: {…}}
+let 新規モード = 保存値("モード", "会話") === "コーディング" ? "コーディング" : "会話"; // まだ会話を作っていないときのモード
+let モデル手動 = false; // まだ会話を作っていないときに、モデルを選び直したか(選び直したら、おすすめより優先)
+let ウェブ可 = false;   // ウェブ検索が使えるか(モデル帳を調べ直せるか)
 
 // --- サーバーとのやりとり ---
 
@@ -78,6 +83,8 @@ async function モデル読込() {
     const j = await API("models");
     モデル群 = j.models;
     const 目録 = j.catalog || [];
+    帳 = 目録;
+    おすすめ = j.recommended || {};
     見えるモデル群 = 目録.filter((m) => m.capabilities.includes("vision")).map((m) => m.name);
     見えないモデル群 = new Set(目録.filter((m) => m.capabilities.length && !m.capabilities.includes("vision")).map((m) => m.name));
     if (モデル群.length === 0) 知らせる("Ollama にモデルがありません。ターミナルで「ollama pull llama3.2」のように入れてから、読み込み直してください。");
@@ -87,9 +94,18 @@ async function モデル読込() {
     知らせる(`Ollama につながりません。Ollama を起動してから読み込み直してください(${e.message})`);
   }
   モデル欄表示();
+  帳表示();
 }
 
+// 新しい会話のモデル: 選び直していなければ、モードのおすすめ(点数のあるもの)。なければ前に選んだもの
+function おすすめモデル() {
+  const r = おすすめ[今のモード()];
+  const k = r && 帳.find((m) => m.name === r.name);
+  return !モデル手動 && k && k.scores && モデル群.includes(r.name) ? r : null;
+}
 function 既定モデル() {
+  const r = おすすめモデル();
+  if (r) return r.name;
   const 前 = 保存値("モデル", "");
   return モデル群.includes(前) ? 前 : (モデル群[0] || "");
 }
@@ -107,6 +123,8 @@ function モデル欄表示() {
   }
   モデル欄.value = 選ぶ;
   モデル欄.disabled = 名群.length === 0;
+  const r = 今 ? null : おすすめモデル();
+  モデル欄.title = r ? `${今のモード()}のおすすめ: ${r.reason}` : "モデル";
   if (typeof 添付欄表示 === "function") 添付欄表示();
 }
 
@@ -114,7 +132,9 @@ function 画像を読めない(名) { return 見えないモデル群.has(名); 
 
 // 会話のモデルを変える(📎 の知らせの「見えるモデル」を押したときにも使う)
 async function モデルを変える(名) {
+  if (!今) モデル手動 = true;
   モデル欄.value = 名;
+  モデル欄.title = "モデル";
   保存する("モデル", 名);
   添付欄表示();
   if (今) 今 = await API(`conversations/${今.id}`, "PUT", { model: 名 });
@@ -123,6 +143,38 @@ async function モデルを変える(名) {
 }
 
 モデル欄.addEventListener("change", () => モデルを変える(モデル欄.value).catch((e) => 知らせる(`モデルを変えられませんでした(${e.message})`)));
+
+// --- モード(💬 会話・🛠 コーディング) ---
+// コーディングにすると、サーバーは場面がコーディングの決まりとリポジトリの決まり(OHANASHI.md など)を読む
+
+function 今のモード() { return 今 ? (今.mode || "会話") : 新規モード; }
+function モード表示() {
+  const コ = 今のモード() === "コーディング";
+  const b = $("モード");
+  b.textContent = "";
+  const 字 = document.createElement("span");
+  字.className = "字";
+  字.textContent = コ ? " コーディング" : " 会話";
+  b.append(コ ? "🛠" : "💬", 字);
+  b.setAttribute("aria-label", `モード: ${コ ? "コーディング" : "会話"}(押すと切り替えます)`);
+}
+async function モード切替() {
+  const 次 = 今のモード() === "コーディング" ? "会話" : "コーディング";
+  保存する("モード", 次);
+  if (今) {
+    try { 今 = await API(`conversations/${今.id}`, "PUT", { mode: 次 }); }
+    catch (e) { 知らせる(`モードを変えられませんでした(${e.message})`); return; }
+    一覧読込();
+  } else {
+    新規モード = 次;
+    新規決まり = null;
+    モデル欄表示();
+  }
+  if (次 === "コーディング" && !砂場ボタン.disabled) 砂場切替(true);
+  モード表示();
+  決まり一覧表示();
+}
+$("モード").addEventListener("click", モード切替);
 
 // --- 会話の一覧 ---
 
@@ -201,7 +253,7 @@ async function 一覧読込() {
   for (const c of 群) {
     const 開いている = 今 && 今.id === c.id;
     const 下 = `${いつ(c.updated)} · ${c.model}` + (c.threads > 1 ? ` · ${c.threads} スレッド` : "");
-    欄.append(一覧行("会話", 道を作る(c.id, 0), c.title || "新しい会話", 下, "", 開いている && !(今.threads.length > 1), { 会話: c.id }));
+    欄.append(一覧行("会話", 道を作る(c.id, 0), (c.mode === "コーディング" ? "🛠 " : "") + (c.title || "新しい会話"), 下, "", 開いている && !(今.threads.length > 1), { 会話: c.id }));
     if (!開いている || 今.threads.length < 2) continue;
     for (const t of 今.threads) {
       欄.append(一覧行("スレッド", 道を作る(c.id, t.id), 筋題(t), いつ(t.updated), "", 筋 && 筋.id === t.id, { スレッド: t.id }));
@@ -343,6 +395,7 @@ function 新規() {
   if (中断) 中断.abort();
   今 = null;
   新規決まり = null;
+  モデル手動 = false;
   筋 = null;
   if (location.hash) history.replaceState(null, "", location.pathname);
   表示し直す();
@@ -367,6 +420,8 @@ function 表示し直す() {
   $("ようこそ").hidden = !!群.length;
   会話題表示();
   for (const m of 群) 発言を足す(m.role, m.content, m.attachments);
+  モード表示();
+  if (今 && 今.mode === "コーディング" && !砂場ボタン.disabled) 砂場切替(true);
   モデル欄表示();
   設定欄表示();
   作り直しボタン付け();
@@ -680,7 +735,7 @@ async function 決まり読込() {
 // 今の会話(会話を作る前なら、選んだもの。選んでいなければ既定のもの)に付ける決まりの番号
 function 今の決まり() {
   if (今) return 今.rules || [];
-  return 新規決まり ?? 決まり群.filter((k) => k.default).map((k) => k.id);
+  return 新規決まり ?? 決まり群.filter((k) => k.default || k.scene === 新規モード).map((k) => k.id);
 }
 
 function 決まり一覧表示() {
@@ -695,7 +750,7 @@ function 決まり一覧表示() {
     印.checked = 付.includes(k.id);
     印.addEventListener("change", () => 決まり付替(印.checked ? [...付, k.id] : 付.filter((n) => n !== k.id)));
     札.append(印, ` ${k.name}`);
-    札.title = `${k.length} 文字` + (k.default ? "・新しい会話に最初から付けます" : "");
+    札.title = `${k.length} 文字` + (場面説明[k.scene] || "");
     li.append(札);
     一覧.append(li);
   }
@@ -713,6 +768,8 @@ function 決まり一覧表示() {
   $("決まり数").textContent = 選.length ? `📜${選.length}` : "";
   $("設定開く").title = 選.length ? `設定(決まりを ${選.length} つ付けています)` : "設定";
 }
+
+const 場面説明 = { いつも: "・新しい会話に最初から付けます", 会話: "・💬 会話モードで付けます", コーディング: "・🛠 コーディングモードで付けます" };
 
 async function 決まり付替(番号群) {
   const 群 = [...new Set(番号群)];
@@ -746,14 +803,14 @@ function 決まり選択表示() {
 async function 決まりを開く(番号) {
   直す決まり = 番号;
   決まり選択表示();
-  let k = { name: "", content: "", default: false };
+  let k = { name: "", content: "", default: false, scene: "" };
   if (番号) {
     try { k = await API(`rules/${番号}`); }
     catch (e) { 知らせる(`決まりを読めませんでした(${e.message})`); return; }
   }
   $("決まり名").value = k.name;
   $("決まり内容").value = k.content;
-  $("決まり既定").checked = k.default;
+  $("決まり場面").value = k.scene ?? (k.default ? "いつも" : "");
   $("決まり消す").hidden = !番号;
   $("決まり案内").textContent = 決まり案内文;
   決まり消す戻す();
@@ -767,7 +824,7 @@ function 決まり内容字数表示() {
 }
 
 async function 決まり保存() {
-  const 本文 = { name: $("決まり名").value.trim(), content: $("決まり内容").value, default: $("決まり既定").checked };
+  const 本文 = { name: $("決まり名").value.trim(), content: $("決まり内容").value, scene: $("決まり場面").value };
   if (!本文.name) { $("決まり名").focus(); 知らせる("決まりの名前を書いてください"); return; }
   if (本文.content.length > 決まり上限) { $("決まり内容").focus(); 知らせる(`決まりは ${決まり上限} 文字までです`); return; }
   try {
@@ -1080,7 +1137,7 @@ async function 送る() {
   try {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
-      今 = await API("conversations", "POST", { model: モデル欄.value, rules: 今の決まり() });
+      今 = await API("conversations", "POST", { model: モデル欄.value, mode: 新規モード, rules: 今の決まり() });
       新規決まり = null;
       if ($("指示").value || !$("温度既定").checked || $("砂場網").checked || $("メモ").value || 新規倉.length) 今 = await API(`conversations/${今.id}`, "PUT", { ...設定の値(), repos: 新規倉 });
       新規倉 = [];
@@ -1178,6 +1235,128 @@ async function 再起動する() {
 }
 $("再起動").addEventListener("click", 再起動する);
 
+// --- モデル帳 ---
+// Ollama のモデルの大きさ・能力と、ウェブで調べた特徴・点数(0〜5)。手で直すと、調べ直しても書きかえない
+
+const 点の名 = [["coding", "コード"], ["chat", "会話"], ["japanese", "日本語"], ["reasoning", "推論"]];
+let 直すモデル = "";   // モデル帳で直している行のモデル
+
+function 大きさ文(バイト) { return バイト ? `${(バイト / 1e9).toFixed(1)} GB` : ""; }
+
+function 帳表示() {
+  const 表 = $("帳表");
+  if (!表) return;
+  表.textContent = "";
+  if (!帳.length) {
+    表.append(Object.assign(document.createElement("p"), { className: "淡 小字", textContent: "まだモデルがありません。" }));
+    return;
+  }
+  for (const m of 帳) 表.append(直すモデル === m.name ? 帳編集行(m) : 帳行(m));
+}
+
+function 帳行(m) {
+  const 行 = document.createElement("div");
+  行.className = "帳行";
+  const 頭 = document.createElement("div");
+  頭.className = "帳頭";
+  const 名 = document.createElement("b");
+  名.textContent = m.name;
+  const 印 = (m.capabilities.includes("tools") ? " 🔧" : "") + (m.capabilities.includes("vision") ? " 👁" : "") + (m.capabilities.includes("thinking") ? " 💭" : "");
+  const 事実 = [m.params ? `${m.params}B` : "", 大きさ文(m.size), m.quantization, m.context ? `文脈 ${m.context}` : ""].filter(Boolean).join(" · ");
+  const 細 = Object.assign(document.createElement("span"), { className: "淡 小字", textContent: `${印} ${事実}` });
+  頭.append(名, 細);
+  const 直 = Object.assign(document.createElement("button"), { type: "button", className: "小", textContent: "直す" });
+  直.addEventListener("click", () => { 直すモデル = m.name; 帳表示(); });
+  頭.append(直);
+  if (ウェブ可 && !m.manual) {
+    const 調 = Object.assign(document.createElement("button"), { type: "button", className: "小", textContent: "調べ直す" });
+    調.addEventListener("click", () => 帳調べ直す(m.name));
+    頭.append(調);
+  }
+  行.append(頭);
+  const 点 = m.scores ? 点の名.map(([k, 名]) => `${名} ${m.scores[k]}`).join("・") : "点数はまだありません";
+  const 誰 = m.manual ? "手で直しました" : m.failed ? "調べられませんでした" : m.researcher ? `${m.researcher} が調べました` : "";
+  行.append(Object.assign(document.createElement("div"), { className: "小字", textContent: 点 + (誰 ? `(${誰})` : "") }));
+  if (m.summary) 行.append(Object.assign(document.createElement("div"), { className: "小字", textContent: m.summary }));
+  if (m.notes) 行.append(Object.assign(document.createElement("div"), { className: "淡 小字", textContent: m.notes }));
+  return 行;
+}
+
+function 帳編集行(m) {
+  const 行 = document.createElement("div");
+  行.className = "帳行 帳編集";
+  行.append(Object.assign(document.createElement("b"), { textContent: m.name }));
+  const 説明 = Object.assign(document.createElement("textarea"), { rows: 2, value: m.summary, placeholder: "特徴(例: 速い。日本語が自然)" });
+  説明.setAttribute("aria-label", "特徴");
+  const 点欄 = document.createElement("div");
+  点欄.className = "行 決まり行";
+  const 点入力 = {};
+  for (const [k, 名] of 点の名) {
+    const i = Object.assign(document.createElement("input"), { type: "number", min: 0, max: 5, step: 1, value: m.scores ? m.scores[k] : 0 });
+    i.setAttribute("aria-label", 名);
+    点入力[k] = i;
+    const l = document.createElement("label");
+    l.className = "並び";
+    l.append(名, i);
+    点欄.append(l);
+  }
+  const 注意 = Object.assign(document.createElement("input"), { value: m.notes, placeholder: "注意(例: 道具の呼び出しが不安定)" });
+  注意.setAttribute("aria-label", "注意");
+  const ボタン欄 = document.createElement("div");
+  ボタン欄.className = "行 決まり行";
+  const 保存 = Object.assign(document.createElement("button"), { type: "button", className: "小 主", textContent: "保存" });
+  保存.addEventListener("click", () => {
+    const scores = Object.fromEntries(点の名.map(([k]) => [k, Math.max(0, Math.min(5, Math.round(Number(点入力[k].value) || 0)))]));
+    帳直す({ name: m.name, summary: 説明.value.trim(), scores, notes: 注意.value.trim(), manual: true });
+  });
+  const 閉 = Object.assign(document.createElement("button"), { type: "button", className: "小", textContent: "閉じる" });
+  閉.addEventListener("click", () => { 直すモデル = ""; 帳表示(); });
+  ボタン欄.append(保存, 閉);
+  if (m.manual) {
+    const 戻 = Object.assign(document.createElement("button"), { type: "button", className: "小", textContent: "手直しをやめる" });
+    戻.title = "次に調べるときに、調べた結果で書きかえます";
+    戻.addEventListener("click", () => 帳直す({ name: m.name, manual: false }));
+    ボタン欄.append(戻);
+  }
+  行.append(説明, 点欄, 注意, ボタン欄);
+  return 行;
+}
+
+async function 帳直す(本文) {
+  try { await API("models", "PUT", 本文); }
+  catch (e) { 知らせる(`モデル帳を直せませんでした(${e.message})`); return; }
+  直すモデル = "";
+  await モデル読込();
+}
+
+async function 帳調べ直す(名) {
+  try { await API("models/research", "POST", 名 ? { name: 名 } : {}); }
+  catch (e) { 知らせる(`調べ直せませんでした(${e.message})`); return; }
+  帳見張る();
+}
+
+function 帳様子表示(c) {
+  const 欄 = $("帳様子");
+  if (c.state) 欄.textContent = `🔎 ${c.researcher} で調べています(${c.done} / ${c.total})` + (c.message ? `: ${c.message}` : "");
+  else 欄.textContent = c.researcher ? `${c.researcher} で調べました(${c.total} 個)` : "";
+  $("帳調べ直す").disabled = !!c.state;
+  if (c.state) 帳見張る();
+}
+
+// 調べている間は2秒ごとに様子を見て、終わったらモデル帳を読み直す
+let 帳見張り = null;
+function 帳見張る() {
+  if (帳見張り) return;
+  帳見張り = setInterval(async () => {
+    let i;
+    try { i = await API("info"); } catch { return; }
+    const c = i.catalog || {};
+    帳様子表示(c);
+    if (!c.state) { clearInterval(帳見張り); 帳見張り = null; await モデル読込(); }
+  }, 2000);
+}
+$("帳調べ直す").addEventListener("click", () => 帳調べ直す(""));
+
 // --- 始める ---
 
 (async () => {
@@ -1202,7 +1381,11 @@ $("再起動").addEventListener("click", 再起動する);
       $("倉案内").textContent = 倉案内文;
       倉候補取得();
     }
+    if (i.catalog) 帳様子表示(i.catalog);
     if (i.web) {
+      ウェブ可 = true;
+      $("帳調べ直す").hidden = false;
+      帳表示();
       ウェブボタン.disabled = false;
       ウェブボタン.title = "押してあると、ウェブで調べてから答えます";
       ウェブ切替(保存値("ウェブ", "") === "1");

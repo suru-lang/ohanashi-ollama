@@ -2,8 +2,10 @@
 #   suru 道具/偽Ollama.suru [ポート]      … 既定のポートは 11435
 # 答えるもの:
 #   GET  /api/version … {"version":"0.0.0-偽"}
-#   GET  /api/tags    … モデル「偽」と「偽-考える」と「偽-見える」
-#   POST /api/show    … 能力(capabilities)。「偽-見える」だけが vision を持つ(画像を読める)。ほかのモデルは 404
+#   GET  /api/tags    … モデル「偽」(1.5B)と「偽-考える」(8B)と「偽-見える」(4B)と「偽-大」(32B)。digest と details も付ける
+#   POST /api/show    … 能力(capabilities)。「偽-見える」だけが vision を、「偽-大」だけが tools を持つ。ほかのモデルは 404
+#   POST /api/chat に format があれば(モデル帳の調べもの)、流さずに1つの JSON で答える。
+#                       答えは「調べるモデル: 名前」のモデルごとに決まった点数で、summary は「調べ役 が調べた 名前」。検索結果があれば notes は「検索あり」
 #   POST /api/chat    … 最後の発言を「おうむ返し: 」を付けて、1文字ずつ NDJSON で流す。画像(images)があれば「 [画像 N 枚]」(すべての発言の画像の数)を付ける。
 #                       モデルが「偽-考える」なら、先に thinking を流す。それ以外のモデルは 404。
 #                       指示(system)と温度が届いていれば、答えの終わりに付ける。「書式」を含む問いには Markdown の見本を返す
@@ -76,7 +78,19 @@ HTTP内の要求 を 数 で 会話応答する は 数 を 返す 入出力動�
 問い を 接続 で 会話応答する とは 入出力手順
   j とは （問い の 本文 を JSON解析する） を 解析値にする
   モデル とは j を 「model」 で 項目文字にする
-  もし モデル = 「偽」 または モデル = 「偽-考える」 または モデル = 「偽-見える」 ならば j を 接続 へ モデル で 流し答えする そうでなければ （（404 で 「{"error":"model '」 + モデル + 「' not found, try pulling it first"}」 を HTTP内の状態応答する） を 接続 へ 「POST」 で HTTP内の応答送信する）
+  もし （モデル = 「偽」 または モデル = 「偽-考える」 または モデル = 「偽-見える」 または モデル = 「偽-大」） かつ （j から 「format」 を JSON取得する） ≠ JSON無 ならば （（j を 調べ答えにする） を HTTP内の本文応答する） を 接続 へ 「POST」 で HTTP内の応答送信する
+  そうでなければ もし モデル = 「偽」 または モデル = 「偽-考える」 または モデル = 「偽-見える」 または モデル = 「偽-大」 ならば j を 接続 へ モデル で 流し答えする そうでなければ （（404 で 「{"error":"model '」 + モデル + 「' not found, try pulling it first"}」 を HTTP内の状態応答する） を 接続 へ 「POST」 で HTTP内の応答送信する）
+
+# モデル帳の調べもの: 最後の問いの「調べるモデル: 名前」の行から名前を読み、決まった点数を JSON の文で返す
+JSON を 調べ答えにする は 文字列 を 返す
+j を 調べ答えにする とは 「{"model":"」 + 役 + 「","message":{"role":"assistant","content":」 + （（中身 の JSON文字列） を JSON文字列にする） + 「},"done":true}」
+ただし 役 とは j を 「model」 で 項目文字にする
+ただし 群 とは j から 「messages」 を JSON取得して 要素群にする
+ただし 問い とは もし 群 が 空 ならば 「」 そうでなければ 群 の 最後 を 「content」 で 項目文字にする
+ただし 名 とは （（問い を 「調べるモデル: 」 で 分割する） の 最後 を 改行 で 分割する） の 先頭
+ただし 点 とは もし 名 = 「偽-大」 ならば 「5,"chat":4,"japanese":4,"reasoning":5」 そうでなければ もし 名 = 「偽-見える」 ならば 「1,"chat":5,"japanese":4,"reasoning":2」 そうでなければ もし 名 = 「偽-考える」 ならば 「2,"chat":3,"japanese":3,"reasoning":4」 そうでなければ 「1,"chat":4,"japanese":3,"reasoning":1」
+ただし 注 とは もし 問い が 「(ウェブの検索結果はありません)」 を 含有である ならば 「」 そうでなければ 「検索あり」
+ただし 中身 とは 「{"summary":」 + （（（役 + 「 が調べた 」 + 名） の JSON文字列） を JSON文字列にする） + 「,"scores":{"coding":」 + 点 + 「},"notes":"」 + 注 + 「"}」
 
 # 道具を呼ぶ番か: tools があり、最後の発言が「コード」を含む問い
 JSON が 道具番である は 真偽 を 返す
@@ -206,7 +220,7 @@ HTTP内の要求 を 数 で 案内する は 数 を 返す 入出力動作
   そうでなければ もし 問い の 道 = 「/api/web_search」 ならば （問い を 検索応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/user」 または 問い の 道 が 「/user/」 で 先頭一致である または 問い の 道 が 「/repos/」 で 先頭一致である ならば （問い を GitHub応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/api/version」 ならば （「{"version":"0.0.0-偽"}」 を HTTP内の本文応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
-  そうでなければ もし 問い の 道 = 「/api/tags」 ならば （「{"models":[{"name":"偽","size":1},{"name":"偽-考える","size":2},{"name":"偽-見える","size":3}]}」 を HTTP内の本文応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
+  そうでなければ もし 問い の 道 = 「/api/tags」 ならば （「{"models":[{"name":"偽","digest":"d1","size":1000000000,"details":{"family":"偽族","parameter_size":"1.5B","quantization_level":"Q4_K_M"}},{"name":"偽-考える","digest":"d2","size":5000000000,"details":{"family":"偽族","parameter_size":"8B","quantization_level":"Q4_K_M"}},{"name":"偽-見える","digest":"d3","size":3000000000,"details":{"family":"偽族","parameter_size":"4B","quantization_level":"Q4_K_M"}},{"name":"偽-大","digest":"d4","size":20000000000,"details":{"family":"偽族","parameter_size":"32B","quantization_level":"Q4_K_M"}}]}」 を HTTP内の本文応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ もし 問い の 道 = 「/api/show」 ならば （問い を 能力応答にする） を 接続 へ 問い の 方法 で HTTP内の応答送信する
   そうでなければ （404 で 「404 page not found」 を HTTP内の状態応答する） を 接続 へ 問い の 方法 で HTTP内の応答送信する
 
@@ -216,6 +230,7 @@ m を 絵数取得する とは （m から 「images」 を JSON取得して �
 HTTP内の要求 を 能力応答にする は HTTP内の応答 を 返す
 問い を 能力応答にする とは
   もし モデル = 「偽-見える」 ならば 「{"capabilities":["completion","vision"],"model_info":{"llama.context_length":4096}}」 を HTTP内の本文応答する
+  そうでなければ もし モデル = 「偽-大」 ならば 「{"capabilities":["completion","tools"],"model_info":{"qwen2.context_length":32768}}」 を HTTP内の本文応答する
   そうでなければ もし モデル = 「偽」 または モデル = 「偽-考える」 ならば 「{"capabilities":["completion"],"model_info":{"llama.context_length":4096}}」 を HTTP内の本文応答する
   そうでなければ 404 で 「{"error":"model not found"}」 を HTTP内の状態応答する
 ただし モデル とは （（問い の 本文 を JSON解析する） を 解析値にする） を 「model」 で 項目文字にする

@@ -27,6 +27,7 @@
     <span id="会話題" class="淡" title="クリックで会話の題を変えます" hidden></span>
     <h1 id="題" title="クリックでスレッドの題を変えます">新しい会話</h1>
     <button id="新スレッド" type="button" class="小" title="この会話に新しいスレッドを作ります。リポジトリなどの設定はそのまま使えます" hidden>＋<span class="字"> スレッド</span></button>
+    <button id="モード" type="button" class="小" title="会話のモード。コーディングにすると、場面がコーディングの決まりとリポジトリの決まり(OHANASHI.md など)を読み、💻 砂場を使います">💬<span class="字"> 会話</span></button>
     <select id="モデル" aria-label="モデル"></select>
     <button id="設定開く" type="button" class="小" aria-label="設定" aria-expanded="false">⚙<span id="決まり数" class="小字" hidden></span></button>
   </header>
@@ -45,7 +46,14 @@
         </div>
         <textarea id="決まり内容" rows="8" placeholder="例:&#10;- 今のコードの書き方に合わせる&#10;- 変えるのは頼まれた所だけにする&#10;- 動かして確かめてから答える" aria-label="決まりの中身"></textarea>
         <div class="行 決まり行">
-          <label class="並び"><input id="決まり既定" type="checkbox"> 新しい会話に最初から付ける</label>
+          <label class="並び">付ける場面
+            <select id="決まり場面" aria-label="決まりを付ける場面">
+              <option value="">手で付ける</option>
+              <option value="いつも">いつも(新しい会話に最初から)</option>
+              <option value="会話">💬 会話モードのとき</option>
+              <option value="コーディング">🛠 コーディングモードのとき</option>
+            </select>
+          </label>
           <span id="決まり内容字数" class="淡 小字"></span>
         </div>
         <div class="行 決まり行">
@@ -82,6 +90,15 @@
       </div>
       <span id="倉案内" class="淡 小字"></span>
     </div>
+    <details id="帳欄">
+      <summary class="欄名">🧠 モデル帳(Ollama のモデルの大きさ・能力と、調べた特徴・点数)</summary>
+      <div class="行 決まり行">
+        <span id="帳様子" class="淡 小字"></span>
+        <button id="帳調べ直す" type="button" class="小" hidden>みな調べ直す</button>
+      </div>
+      <div id="帳表"></div>
+      <span class="淡 小字">点数は 0〜5(コード・会話・日本語・推論)。新しい会話のモデルは、モードの点数が高いものを選びます(選び直したモデルが優先)。手で直したものは、調べ直しても書きかえません。調べるときは、モデルの名前をウェブ検索に送ります。</span>
+    </details>
     <div class="行" id="更新欄" hidden>
       <button id="再起動" type="button" class="小">🔄 最新にして再起動</button>
       <span id="更新状態" class="淡 小字"></span>
