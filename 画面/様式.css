@@ -308,7 +308,7 @@ button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
   body.横欄開 #横欄 { transform: none; }
   .発言, .発言.assistant, .失敗 { max-width: 100%; width: auto; }
   .発言.assistant { width: 100%; }
-  button.切替 .字, #新スレッド .字 { display: none; }
+  button.切替 .字, #新スレッド .字, #モード .字 { display: none; }
   /* 入力欄は1行目いっぱいに、ボタンはその下に並べる */
   form { flex-wrap: wrap; }
   #文 { flex-basis: 100%; order: -1; }
@@ -318,3 +318,15 @@ button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
   .項目 .消す { visibility: visible; }
   select { max-width: 35%; }
 }
+
+/* --- モデル帳 --- */
+#帳欄 { font-size: 0.9rem; }
+#帳欄 summary { cursor: pointer; }
+#帳表 { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.帳行 { padding: 6px 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--地); overflow-wrap: anywhere; }
+.帳頭 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.帳頭 button { margin-left: auto; }
+.帳頭 button + button { margin-left: 0; }
+.帳編集 { display: flex; flex-direction: column; gap: 6px; }
+.帳編集 textarea, .帳編集 input:not([type]) { width: 100%; padding: 5px 8px; border: 1px solid var(--線); border-radius: 10px; background: var(--面); }
+.帳編集 input[type="number"] { width: 3.5em; margin-left: 4px; }

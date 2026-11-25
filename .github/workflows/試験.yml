@@ -53,12 +53,14 @@ jobs:
           ~/go/bin/kumu 作る
           ~/go/bin/suruc 道具/偽Ollama.suru -o 出力/偽Ollama
           ./出力/偽Ollama 11435 > 出力/偽Ollama.log 2>&1 &
-          OLLAMA_API_KEY=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8090 --web-search http://127.0.0.1:11435/api/web_search > 出力/アプリ.log 2>&1 &
+          OLLAMA_API_KEY=試し鍵 ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8090 --web-search http://127.0.0.1:11435/api/web_search --no-research > 出力/アプリ.log 2>&1 &
           for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8090/ && break; sleep 0.2; done
           B=http://127.0.0.1:8090
           curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $B/ | grep -x '200 text/html; charset=utf-8'
           curl -s $B/api/info | grep -F '"version":"0.0.0-偽","web":true'
-          curl -s $B/api/models | grep -F '{"models":["偽","偽-考える","偽-見える"],"catalog":[{"name":"偽","capabilities":["completion"]},{"name":"偽-考える","capabilities":["completion"]},{"name":"偽-見える","capabilities":["completion","vision"]}]}'
+          curl -s $B/api/models | tee 出力/モデル | grep -F '{"models":["偽","偽-考える","偽-見える","偽-大"],"catalog":[{"name":"偽","capabilities":["completion"],"size":1000000000,"family":"偽族","params":1.5,"quantization":"Q4_K_M","context":4096,"summary":"","scores":null,'
+          grep -F '{"name":"偽-大","capabilities":["completion","tools"],' 出力/モデル
+          grep -F '"recommended":{"会話":{"name":"偽-大","reason":"点数がまだないので、一番大きいモデル"},"コーディング":{"name":"偽-大",' 出力/モデル
           curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"id":1'
           curl -s -X POST -d '{"role":"user","content":"やあ"}' $B/api/conversations/1/messages | grep -F '"title":"やあ"'
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | tee 出力/答え
@@ -75,7 +77,7 @@ jobs:
           [ "$(grep -o '"content":"[^"]*"' 出力/検索答え | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "おうむ返し: 天気 [検索あり]" ]
           curl -s -X POST -d '{"conversation":1}' $B/api/chat | grep -c sources | grep -x 0
           # SearXNG: 問いを URL に符号化して送り、はじめの5つを使う(偽の SearXNG は6つ返す)
-          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8091 --searxng http://127.0.0.1:11435/ > 出力/アプリ2.log 2>&1 &
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/試し.db --port 8091 --searxng http://127.0.0.1:11435/ --no-research > 出力/アプリ2.log 2>&1 &
           for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8091/ && break; sleep 0.2; done
           curl -s http://127.0.0.1:8091/api/info | grep -F '"web":true'
           curl -s -X POST -d '{"conversation":1,"web":true}' http://127.0.0.1:8091/api/chat | tee 出力/SearXNG答え
@@ -129,7 +131,7 @@ jobs:
           grep -o '"content":"[^"]*"' 出力/メモ答え | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F '[指示: 短く\n\n## これまでのスレッドで分かったこと\n\n枝は ohanashi/x]'
           # 決まり: はじめに見本が1つある。会話に付けると、見出しを付けて指示の前に届く。直すと次の答えから効く
           curl -s $B/api/rules | grep -F '[{"id":1,"name":"コードを書くときの決まり","default":false,'
-          curl -s -X POST -d '{"name":"敬語","content":"です・ます で答える"}' $B/api/rules | grep -F '{"id":2,"name":"敬語","content":"です・ます で答える","default":false}'
+          curl -s -X POST -d '{"name":"敬語","content":"です・ます で答える"}' $B/api/rules | grep -F '{"id":2,"name":"敬語","content":"です・ます で答える","default":false,"scene":""}'
           curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{"name":" ","content":"x"}' $B/api/rules | grep -x 400
           curl -s -X PUT -d '{"rules":[2]}' $B/api/conversations/1 | grep -F '"rules":[2]'
           curl -s -X POST -d '{"role":"user","content":"決まりは"}' $B/api/conversations/1/messages > /dev/null
@@ -176,6 +178,40 @@ jobs:
           # 会話を消すと添付も消える
           curl -s -o /dev/null -w '%{http_code}\n' $B/api/attachments/1 | grep -x 404
           kill %1 %2
+      - name: モードと、モデル帳(調べもの・おすすめ・手直し)
+        run: |
+          ./出力/偽Ollama 11435 > 出力/偽Ollama2.log 2>&1 &
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:11435/api/version && break; sleep 0.2; done
+          # 調べ役に貧弱な 偽(1.5B)を指名すると、道具を使える大きな 偽-大 で調べ直す
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/帳.db --port 8092 --searxng http://127.0.0.1:11435/ --research-model 偽 > 出力/アプリ帳.log 2>&1 &
+          B=http://127.0.0.1:8092
+          for i in $(seq 100); do grep -q '調べ終わりました' 出力/アプリ帳.log && break; sleep 0.2; done
+          cat 出力/アプリ帳.log
+          grep -F 'モデル帳: 偽 で調べた結果が貧弱なので、偽-大 で調べ直しています。' 出力/アプリ帳.log
+          curl -s $B/api/models | tee 出力/帳モデル
+          grep -F '"summary":"偽-大 が調べた 偽-見える","scores":{"coding":1,"chat":5,"japanese":4,"reasoning":2},"notes":"検索あり","researcher":"偽-大",' 出力/帳モデル
+          grep -F '"recommended":{"会話":{"name":"偽-見える","reason":"会話の点数 5・日本語 4"},"コーディング":{"name":"偽-大","reason":"コードの点数 5・日本語 4・道具を使える"}}' 出力/帳モデル
+          curl -s $B/api/info | grep -F '"catalog":{"state":"","done":4,"total":4,"researcher":"偽-大"'
+          # 手で直したものは、調べ直しても書きかえない
+          curl -s -X PUT -d '{"name":"偽","summary":"手で直した","scores":{"coding":2,"chat":2,"japanese":2,"reasoning":2},"notes":"","manual":true}' $B/api/models | grep -F '"summary":"手で直した","scores":{"coding":2,"chat":2,"japanese":2,"reasoning":2},"notes":"","researcher":"偽-大",'
+          curl -s -o /dev/null -w '%{http_code}\n' -X PUT -d '{"name":"ない","summary":"x","scores":{"coding":1,"chat":1,"japanese":1,"reasoning":1}}' $B/api/models | grep -x 404
+          curl -s -o /dev/null -w '%{http_code}\n' -X PUT -d '{"name":"偽","summary":"x","scores":{"coding":9}}' $B/api/models | grep -x 400
+          curl -s -X POST -d '{}' $B/api/models/research | grep -F '{"research":true}'
+          for i in $(seq 100); do [ "$(grep -c '調べ終わりました' 出力/アプリ帳.log)" = 2 ] && break; sleep 0.2; done
+          curl -s $B/api/models | grep -F '"summary":"手で直した",'
+          # モデルを省いて会話を作ると、モードのおすすめになる。コーディングにすると場面がコーディングの決まりが付き、会話に戻すと外れる
+          curl -s $B/api/rules | grep -F '"scene":"コーディング"}]'
+          curl -s -X POST -d '{"mode":"コーディング"}' $B/api/conversations | tee 出力/モード | grep -F '"model":"偽-大",'
+          grep -F '"rules":[1],' 出力/モード
+          grep -F '"mode":"コーディング"' 出力/モード
+          curl -s -X POST -d '{}' $B/api/conversations | grep -F '"model":"偽-見える",'
+          curl -s -X PUT -d '{"mode":"会話"}' $B/api/conversations/1 | grep -F '"rules":[],'
+          curl -s -X PUT -d '{"mode":"コーディング"}' $B/api/conversations/2 | grep -F '"rules":[1],'
+          # 場面「いつも」の決まりは既定の決まり(新しい会話に付く)
+          curl -s -X POST -d '{"name":"短く","content":"短く答える","scene":"いつも"}' $B/api/rules | grep -F '"default":true,"scene":"いつも"}'
+          curl -s -X POST -d '{"mode":"会話","model":"偽"}' $B/api/conversations | grep -F '"model":"偽",' | grep -F '"rules":[2],'
+          kill %1 %2
+
       - name: 偽の GitHub を相手に、会話のリポジトリを読む
         run: |
           ./出力/偽Ollama 11436 > 出力/偽Ollama5.log 2>&1 &
