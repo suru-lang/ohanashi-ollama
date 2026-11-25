@@ -85,6 +85,18 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 
 **注意:** 画面を開ける人は、だれでも再起動を頼めます(手元の枝を最新にして作り直すだけで、ほかのコードは動かせません)。
 
+### ほかの機械から https で開く(Tailscale Serve)
+
+スマホなどほかの機械から開くときは、[Tailscale](https://tailscale.com/) の [Serve](https://tailscale.com/kb/1312/serve) を前に置くと、`https://機械の名前.tailnet名.ts.net/` で開けます。https で開くと、ブラウザの通知など安全な場所(secure context)でしか使えないものも使えます。Tailscale につないだ機械からだけ開けて、証明書は Tailscale が用意します。
+
+1. [管理画面の DNS](https://login.tailscale.com/admin/dns) で、**MagicDNS** と **HTTPS Certificates** を入れる
+2. ohanashi-ollama は、いつもどおり起動する(`--listen` は既定の 127.0.0.1 のままでかまいません)
+3. 同じ機械で `tailscale serve --bg 8080` と打つ(`--port` を変えたときはその番号)。出てきた `https://…ts.net/` を、Tailscale につないだスマホなどで開く
+
+止めるときは `tailscale serve --https=443 off` です。今の設定は `tailscale serve status` で見られます。
+
+**注意:** HTTPS の証明書を作ると、機械の名前と tailnet の名前が証明書の公開記録(Certificate Transparency)に載ります。会話の中身は外からは見えません。
+
 ### モードとモデル帳
 
 見出しの「💬 会話」を押すと「🛠 コーディング」に切り替わります(もう一度押すと戻ります)。新しい会話は、前に選んだモードで始まります。
@@ -262,7 +274,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
    - push して PR を作る: Contents と Pull requests を Read and write
 4. できた鍵(`github_pat_…`)を `GITHUB_TOKEN` に入れて起動する
 
-**注意:** 画面は既定で 127.0.0.1 だけで待ち受けるので、同じ機械の中からだけ開けます。ほかの機械(スマホなど)から開くときは `--listen 0.0.0.0` で起動します。そのときは同じネットワークのだれでも会話を読めるので、信用できるネットワークだけで使ってください。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
+**注意:** 画面は既定で 127.0.0.1 だけで待ち受けるので、同じ機械の中からだけ開けます。ほかの機械(スマホなど)から開くときは `--listen 0.0.0.0` で起動します。そのときは同じネットワークのだれでも会話を読めるので、信用できるネットワークだけで使ってください。Tailscale を使っているなら、[Tailscale Serve](#ほかの機械から-https-で開くtailscale-serve) で https から開くほうが安全です。ほかのサイトのページから会話を読み書きされないように、`Origin` の見出しが自分と違う要求は断ります。
 
 ## 試験
 
@@ -513,6 +525,12 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 5. **通知の中身。** 題はスレッドの題、本文は途中経過を除いた答えの頭(Markdown の記号を除いて 100 文字まで)です。失敗は「失敗しました: …」。`tag` をスレッドごとにして、同じスレッドの通知は1つにまとめます。押すと、そのタブに戻ってそのスレッドを開きます。タブを見たら、出した通知を閉じます。中身を作るところは `画面/通知.js` にまとめ、`node 道具/通知試験.js` で確かめます。
 6. **通知は安全な場所でだけ。** ブラウザの通知は localhost か https で開いたときだけ使えます。ほかの機械から `http://192.168.…` で開いたときは ⚙ の印を押せなくして、その理由を出します。音は鳴らさず、OS の通知の音に任せます。
 7. **タブを閉じていると届かない。** タブを閉じていても届けるには Service Worker と Web Push が要り、https と鍵の用意とサーバーの変更も要るので、今はしていません。
+
+### https
+
+1. **TLS は Tailscale Serve に任せる。** http ライブラリの HTTPS はクライアントだけで、サーバーの TLS はありません。する の「通信」のソケットは OS の fd ではないので、サーバーの TLS を作るには本体と http ライブラリの両方に手が要ります。ほかの機械から開くのは Tailscale を使うことが多いので、証明書の用意も更新もしてくれる Tailscale Serve を前に置くことにしました(#75・#76)。
+2. **Origin は http と https のどちらでも。** Tailscale Serve は Host をそのまま渡すので、https で開くと `Origin` が `https://` + Host になります。`Origin` が `http://` + Host か `https://` + Host なら受け付け、ほかのサイトからは今のとおり断ります。
+3. **WebSocket は画面の URL から。** 画面は `location.href` の `http` を `ws` に変えて WebSocket の URL を作るので、https で開けば `wss://` になります。
 
 ## 今後の候補
 
