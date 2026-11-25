@@ -54,7 +54,7 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 | `--db ファイル` | 会話をしまう SQLite のファイル | `ohanashi.db` |
 | `--screen フォルダ` | 画面のファイルのフォルダ | `画面` |
 | `--searxng URL` | ウェブ検索に使う SearXNG | 環境変数 `SEARXNG_URL`、なければ使わない |
-| `--sandbox-image イメージ` | 砂場のコンテナのイメージ | `python:3.12-slim` |
+| `--sandbox-image イメージ` | 砂場のコンテナのイメージ | `ohanashi-sandbox`(手元にあれば。なければ `python:3.12-slim`) |
 | `--sandbox-network ネットワーク` | 砂場のコンテナの `--network` | `none`(外につながらない) |
 | `--work フォルダ` | 砂場と共有する作業フォルダの親 | `作業` |
 | `--web-search URL` | ウェブ検索の API | `https://ollama.com/api/web_search` |
@@ -184,6 +184,20 @@ OLLAMA_API_KEY=キー kumu 実行
 
 コンテナは会話を消すと消えます(作業フォルダは残ります)。モデルが動かすコマンドは確かめずに行うので、作業フォルダに大事なファイルを置かないでください。
 
+答えの中で作業フォルダにファイルができたり変わったりすると、答えの終わりに「📄 報告.docx(24KB)」のようなリンクが出ます。押すと落とせます(PDF と画像はブラウザで開きます)。前にできたファイルも、⚙ の設定の「📁 作業フォルダ」から落とせます。
+
+#### Word・PDF の文書を作る
+
+文書を作れる砂場のイメージ `ohanashi-sandbox` を作っておくと、モデルに道具 `make_document` も渡します。「今の話を Word の報告にまとめて」「PDF にして」と頼むと、モデルが Markdown で中身を書き、砂場の中で Word(docx)か PDF にします。できたファイルは答えの終わりのリンクから落とせます。
+
+```sh
+docker build -t ohanashi-sandbox 砂場    # 目安 1GB ほど。作ったら起動し直す
+```
+
+イメージは `python:3.12-slim`(Debian bookworm)に、pandoc・WeasyPrint・python-docx・openpyxl・matplotlib と日本語のフォント(Noto CJK)を足したものです([砂場/Dockerfile](砂場/Dockerfile))。`--sandbox-image` を付けずに起動すると、`ohanashi-sandbox` があればそれを使い、「砂場: ohanashi-sandbox で、Word・PDF の文書を作れます」と出します。なければ今までどおり `python:3.12-slim` を使い、`make_document` は渡しません。[起動.sh](起動.sh) は、`砂場/` が変わったときにイメージを作り直します(Docker がなければ飛ばします)。表や図の凝った文書は、モデルが `run` で python(python-docx・openpyxl・matplotlib)を書いて作ることもできます。
+
+モデルが道具を使わずに「報告.docx を作成しました」と書いたときは、一度だけ道具で作るように頼み直し、それでもできなければ「⚠ ファイルはできていません」と出します。
+
 ### GitHub のリポジトリを読む
 
 GitHub の鍵を環境変数 `GITHUB_TOKEN` に入れて起動します(環境変数で渡すと、`ps` に出ません)。
@@ -252,7 +266,7 @@ GITHUB_TOKEN=github_pat_… kumu 実行
 ## 試験
 
 ```sh
-kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許し・決まりのまとめ方の試験
+kumu 試験                   # 会話帳(SQLite)・Ollama の行の読み方・ウェブ検索・引数・GitHub の許し・決まりのまとめ方・作業フォルダのファイルの試験
 node 道具/書式試験.js        # 画面の Markdown の変換の試験
 node 道具/道試験.js          # 画面の道(#会話/スレッド)の試験
 node 道具/頁試験.js          # PDF の文字のないページを画像にするところの試験
@@ -278,6 +292,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [詰替.suru](詰替.suru) | 会話帳の会話と発言を、Ollama のライブラリの発言と依頼にする |
 | [ウェブ検索.suru](ウェブ検索.suru) | SearXNG か Ollama の web 検索 API で調べて、モデルに渡す指示と出典にする |
 | [砂場.suru](砂場.suru) | 砂場(Docker のコンテナ)を作り、モデルの道具の呼び出しを行う |
+| [作業ファイル.suru](作業ファイル.suru) | 砂場の作業フォルダのファイルを数え、答えの中でできたものを見つけ、画面から落とせるようにする |
+| [砂場/](砂場/) | 文書を作れる砂場のイメージ `ohanashi-sandbox`(`Dockerfile`、Markdown を docx・PDF にする `文書.py`、PDF の見た目 `文書.css`) |
 | [規則.suru](規則.suru) | 会話に付けた決まりと、作業フォルダのリポジトリの決まりのファイル(`OHANASHI.md` など)を、モデルに渡す1つの指示にまとめる |
 | [GitHub道具.suru](GitHub道具.suru) | GitHub の道具(リポジトリ・ツリー・ファイル・issue を読む、issue と PR を書く)と、会話のリポジトリの許し |
 | [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
@@ -293,7 +309,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | 道 | 答え |
 |---|---|
 | `GET /api/github/repos` | 会話に足すリポジトリの候補(鍵で使えるもの。`--github-repos` があればそれに入るものだけ) `{"repos":[…]}` |
-| `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"github":真偽,"githubRepos":[…],"githubUser":…}` |
+| `GET /api/info` | Ollama の場所と版、ウェブ検索と砂場を使えるか `{"ollama":…,"version":…,"web":真偽,"sandbox":真偽,"documents":真偽(砂場で文書を作れるか),"github":真偽,"githubRepos":[…],"githubUser":…}` |
 | `GET /api/models` | 入っているモデルの名前と、モデル帳とおすすめ `{"models":[…],"catalog":[{"name":…,"capabilities":["completion","vision",…],"size":バイト,"family":…,"params":10億の数,"quantization":…,"context":…,"summary":…,"scores":{"coding":…,"chat":…,"japanese":…,"reasoning":…}かnull,"notes":…,"researcher":…,"researched":時刻,"failed":真偽,"manual":真偽},…],"recommended":{"会話":{"name":…,"reason":…},"コーディング":{…}}}` |
 | `PUT /api/models` | モデル帳を手で直す `{"name":…,"summary":…,"scores":{…},"notes":…}`(`"manual":false` なら手直しをやめて、次に調べ直す) |
 | `POST /api/models/research` | 調べ直す `{"name":…(省くと全部),"researcher":…(省くと選ぶ)}`。様子は `/api/info` の `"catalog":{"state":…,"done":…,"total":…,"researcher":…,"message":…}` |
@@ -303,6 +319,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET・PUT・DELETE /api/conversations/番号` | 会話の中身(設定と `"threads":[{"id":…,"title":…,"updated":…}]`)を読む・題とモデルと指示と温度と砂場のネットワーク(`"network":真偽`)と GitHub のリポジトリ(`"repos":[{"repo":…,"write":真偽}]`)とメモ(`"memo":…`、8000 文字まで)とモード(`"mode":…`、変えると場面の決まりを付け直す)と付ける決まり(`"rules":[決まりの番号, …]`、この順にまとめる)を変える・消す(スレッドと発言も消える) |
 | `GET・POST /api/rules` | 決まりの一覧 `[{"id":…,"name":…,"default":真偽,"length":文字数,"updated":…,"uses":付けている会話の数,"scene":場面}, …]`・決まりを作る `{"name":…,"content":…,"scene":""か"いつも"か"会話"か"コーディング"}`(前の `"default":真偽` も使える)(名前は 100 文字、中身は 8000 文字まで) |
 | `GET・PUT・DELETE /api/rules/番号` | 決まりの中身 `{"id":…,"name":…,"content":…,"default":真偽,"scene":…}` を読む・変える(本文にある項目だけ)・消す(付けている会話から外れる) |
+| `GET /api/conversations/番号/files` | 砂場の作業フォルダ(`作業/会話の番号`)のファイルの一覧 `{"files":[{"path":…,"size":…,"modified":…,"dir":真偽}, …],"truncated":真偽}`(`.git` は除き、clone したリポジトリはフォルダの名前だけ。500 まで) |
+| `GET /api/conversations/番号/files/道` | 作業フォルダのファイル(`Content-Disposition: attachment`。PDF と画像は `?view=1` で `inline`) |
 | `GET・POST /api/conversations/番号/threads` | スレッドの一覧・スレッドを作る `{"title":…}`(省ける) |
 | `GET・PUT・DELETE /api/threads/番号` | スレッドの中身 `{"id":…,"conversation":…,"title":…,"messages":[…]}` を読む・題を変える・消す(会話の最後のスレッドは消せない) |
 | `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}`。問いには `"attachments":[{"kind":"image","name":…,"type":"image/jpeg","data":"base64…"}, {"kind":"text","name":…,"type":…,"text":…,"pages":…}]` を添えられる。スレッドの中身の発言には、添えたものの目録 `"attachments":[{"id":…,"kind":…,"name":…,"type":…,"pages":…,"chars":…}]` が付く |
@@ -312,7 +330,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"summary":true` なら、スレッドのまとめを流す(しまわない)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
 | `POST /api/chat` | WebSocket を使えないときの同じもの(1行1つの JSON) |
 
-流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…,"prompt":送った文のトークンの数}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
+流す答えは1つずつの JSON です: `{"content":…}`(答えの続き)、`{"thinking":…}`(考え)、`{"stats":{"tokens":…,"seconds":…,"prompt":送った文のトークンの数}}`、`{"error":…}`。ウェブで調べたときは、はじめに `{"sources":[{"title":…,"url":…}, …]}`(調べられなかったときは `{"notice":…}`)を送ります。砂場で道具を使ったときは、使う前に `{"running":…}`、使った後に `{"tool":{"name":"run","command":…,"output":…,"code":…}}` か `{"tool":{"name":"write_file","path":…,"content":…,"output":…}}`(`make_document` は `{"tool":{"name":"make_document","path":…,"format":…,"output":…}}`)を送ります。答えの中で作業フォルダにファイルができた・変わったときは、終わりに `{"files":[{"path":…,"size":…}, …]}` を送ります。GitHub の道具では `{"running":"🐙 …を読んでいます"}` と `{"tool":{"name":"github_file","summary":…}}` を送ります(中身は送りません)。WebSocket では最後に `{"done":true}` を送ります。
 
 ## 決めたこと
 
@@ -466,6 +484,24 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 8. **おすすめは会話を作るときだけ。** 点数のあるモデルから、モードの点数(コーディングは道具を使えるものから。なければ全部から)、日本語の点数、小ささの順で選びます。点数がなければ一番大きいモデル(コーディングは道具を使えるもの)。画面は点数のあるおすすめだけを使い、なければ前に選んだモデルにします。会話を作ったあとは、モデルを勝手に変えません。
 9. **`keep_alive` と時間切れは決めていない。** suru-lang/ollama 0.2.0 にないので、調べるたびに Ollama の既定でモデルを読み込みます。大きなモデルに切り替えると、その間ほかの答えが遅くなることがあります。
 
+### 作業フォルダのファイル
+
+1. **数えるのは手元の sh。** `find` と `stat`(GNU の `stat -c` がなければ macOS の `stat -f`)で、作業フォルダのファイルの道・大きさ・変えた時刻を読みます。コンテナがなくても(会話を消したあとでも)一覧を出せます。`.git` と、`make_document` の下書きのフォルダ `.文書` は入れません。`.git` のあるフォルダ(`github_clone` で作ったもの)は中が多いので、フォルダの名前だけを出します。500 個までです。
+2. **できたファイルは、答えの前と後の一覧を比べて見つける。** 砂場を使う答えでは、始める前に一覧を読み、終わったときにもう一度読んで、新しいか、大きさか時刻が変わったファイルを `{"files":…}` で画面に送ります。`run`・`write_file`・`make_document` のどれで作っても同じに見つかります。
+3. **リンクは答えといっしょに保存し、モデルには送らない。** 画面は `files` を受け取ったら、答えの終わりに「📄 [名前](道)(大きさ)」の行を足して保存します。道具の跡と同じく、「📄 」で始まる行は次にモデルへ送るときに除きます。
+4. **配るのは suru-lang/http の `前置付配信する`。** その会話の作業フォルダの中だけを配ります。「..」「.」「\」、`%00`、フォルダの外を指すシンボリックリンクは 403、「.」で始まる名前は 404 です。
+5. **落とすのが基本。** `Content-Disposition: attachment` を付けます。PDF と画像(PNG・JPEG・GIF・WebP)だけは、`?view=1` で `inline` にしてブラウザで開きます。モデルが書いた HTML や SVG が、この画面と同じ所でスクリプトを動かさないように、`X-Content-Type-Options: nosniff` と(PDF のほかは)`Content-Security-Policy: sandbox` も付けます。docx・xlsx・pptx の `Content-Type` はアプリで持ちます。
+
+### 文書を作る
+
+1. **文書は砂場で作る。** サーバーは pandoc などを持たず、Markdown をコンテナの `/work/.文書/元.md` に書いて、コンテナの中の `/opt/ohanashi/文書.py` で変えます。手元を汚さず、モデルの書いたものを手元で動かしません。
+2. **道具は1つ、モデルは Markdown を書くだけ。** `make_document`(`format`: `pdf`・`docx`、`path`、`markdown`、`title`)です。小さいモデルでも python-docx のコードを書かずに作れます。`path` を省くと `出力/題.拡張子` にします。`/work` の外や「.」で始まる名前は断ります。結果は「📄 出力/報告.pdf を作りました(3 ページ・48KB)」です。
+3. **docx は pandoc の既定、PDF は pandoc → HTML → WeasyPrint。** 日本語のフォントと CSS([砂場/文書.css](砂場/文書.css)。A4、表の罫線、ページ番号)が使えます。LaTeX と LibreOffice は大きいので入れていません。
+4. **文書を作れるイメージかは、イメージの印で見る。** `砂場/Dockerfile` に `LABEL ohanashi.documents="1"` を付け、起動のときに `docker image inspect` で見ます。印があれば `make_document` を渡し、案内にも「Word や PDF を頼まれたら make_document を使う」と書きます。`--sandbox-image` を付けなければ、`ohanashi-sandbox` があればそれを使います。
+5. **版は固定する。** 元のイメージは `python:3.12-slim-bookworm`、pip で入れるもの(WeasyPrint 62.3 と、それに合う pydyf 0.11.0 など)は版を書きます。pandoc とフォントは Debian bookworm のものです。
+6. **作ったと書いただけなら、一度だけ頼み直す。** 答えに「作成しました」「作りました」「ダウンロード」などと、`.docx`・`.pdf` などの名前があるのに、その答えの中で作業フォルダにファイルができていなければ、GitHub の push・PR と同じく、道具で作るように頼み直します。それでもできなければ「⚠ ファイルはできていません」と出します。前の答えでできたファイル(「📄 」の行にある名前)を、また書いても知らせません。
+7. **できたファイルは添付にしない。** 作業フォルダにあれば十分なので、会話の添付(画像・PDF を読ませるもの)には入れません。モデルに読ませたいときは、落として 📎 で添えます。
+
 ## 今後の候補
 
 - 画面のファイルを実行ファイルに入れて、どのフォルダからでも起動できるようにする
@@ -473,7 +509,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 - 会話を Markdown・JSON に書き出す
 - 添付: 文のある PDF のページも選んで画像にする(図の多いページ)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける
-- 砂場: 作業フォルダのファイルを画面で見る・落とす、コマンドを動かす前に確かめる、コンテナを手元の利用者で動かす
+- 砂場: コマンドを動かす前に確かめる、コンテナを手元の利用者で動かす
+- 文書: Excel・PowerPoint も作る(`make_document` の `format` に `xlsx`・`pptx`)、`砂場/見本.docx` で Word の見た目をそろえる
 - 長い会話を、モデルの文脈の長さ(`num_ctx`)に合わせて切り詰める
 - 問いを書き直して、そこから先を作り直す
 - モデル帳: 調べるときに Ollama の `keep_alive` を短くする、モデルごとの得意な言語を記録する、画面で調べ役を選ぶ

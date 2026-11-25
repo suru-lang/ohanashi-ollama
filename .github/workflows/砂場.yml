@@ -1,0 +1,112 @@
+# 文書を作れる砂場のイメージ ohanashi-sandbox(砂場/Dockerfile)を作り、日本語の Markdown から docx と PDF ができることと、
+# 偽の Ollama を相手に、道具 make_document で作った文書を画面の道から落とせることを確かめます。
+# イメージを作るのに数分かかるので、砂場と文書にかかわるファイルが変わったときだけ動かします。
+name: 砂場のイメージ
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "砂場/**"
+      - "砂場.suru"
+      - "作業ファイル.suru"
+      - "本体.suru"
+      - "道具/偽Ollama.suru"
+      - ".github/workflows/砂場.yml"
+  pull_request:
+    paths:
+      - "砂場/**"
+      - "砂場.suru"
+      - "作業ファイル.suru"
+      - "本体.suru"
+      - "道具/偽Ollama.suru"
+      - ".github/workflows/砂場.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: clang と libsqlite3 と OpenSSL と poppler-utils を入れる
+        run: sudo apt-get update && sudo apt-get install -y clang libsqlite3-dev libssl-dev poppler-utils unzip
+      - name: kumu と suruc を入れる
+        env:
+          GOPROXY: direct
+        run: |
+          go install github.com/suru-lang/suru/cmd/kumu@main
+          go install github.com/suru-lang/suru/cmd/suruc@main
+      - name: イメージを作る
+        run: |
+          docker build -t ohanashi-sandbox 砂場
+          docker image ls ohanashi-sandbox
+          [ "$(docker image inspect -f '{{index .Config.Labels "ohanashi.documents"}}' ohanashi-sandbox)" = 1 ]
+      - name: 日本語の Markdown から docx と PDF を作る
+        run: |
+          mkdir -p 出力/文書試し/.文書
+          printf '# 報告\n\n日本語の本文です。\n\n| 名前 | 値 |\n|---|---|\n| りんご | 1 |\n\n```python\nprint("こんにちは")\n```\n' > 出力/文書試し/.文書/元.md
+          docker run --rm --network none -v "$PWD/出力/文書試し":/work -w /work ohanashi-sandbox sh -c 'pandoc --version | head -1 && python /opt/ohanashi/文書.py docx .文書/元.md 出力/報告.docx 四半期の報告 && python /opt/ohanashi/文書.py pdf .文書/元.md 出力/報告.pdf 四半期の報告' | tee 出力/文書結果
+          grep -E '^pages=0 bytes=[0-9]+$' 出力/文書結果
+          grep -E '^pages=1 bytes=[0-9]+$' 出力/文書結果
+          unzip -p 出力/文書試し/出力/報告.docx word/document.xml | grep -F '日本語の本文です。'
+          unzip -p 出力/文書試し/出力/報告.docx word/document.xml | grep -F '四半期の報告'
+          pdftotext 出力/文書試し/出力/報告.pdf - | tee 出力/文書PDF
+          grep -F '日本語の本文です。' 出力/文書PDF
+          grep -F 'りんご' 出力/文書PDF
+          pdffonts 出力/文書試し/出力/報告.pdf | tee 出力/文書字形
+          grep -F 'Noto-Sans-CJK-JP' 出力/文書字形
+          # 読めない Markdown の場所は、理由を出して 1 で終わる
+          ! docker run --rm --network none -v "$PWD/出力/文書試し":/work -w /work ohanashi-sandbox python /opt/ohanashi/文書.py pdf .文書/ない.md 出力/x.pdf
+      - name: 偽の Ollama を相手に、make_document で文書を作って落とす
+        run: |
+          ~/go/bin/kumu 作る
+          ~/go/bin/suruc 道具/偽Ollama.suru -o 出力/偽Ollama
+          ./出力/偽Ollama 11435 > 出力/偽Ollama.log 2>&1 &
+          ./出力/ohanashi-ollama --ollama http://127.0.0.1:11435 --db 出力/文書.db --port 8093 --work 出力/作業D --no-research > 出力/アプリ.log 2>&1 &
+          for i in $(seq 50); do curl -s -o /dev/null http://127.0.0.1:8093/ && break; sleep 0.2; done
+          B=http://127.0.0.1:8093
+          grep -F '砂場: ohanashi-sandbox で、Word・PDF の文書を作れます(道具 make_document)。' 出力/アプリ.log
+          curl -s $B/api/info | grep -F '"sandbox":true,"documents":true'
+          curl -s -X POST -d '{"model":"偽"}' $B/api/conversations | grep -F '"id":1'
+          話す() { curl -s -X POST -d "{\"role\":\"user\",\"content\":\"$1\"}" $B/api/conversations/1/messages > /dev/null; curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat; }
+          # Word
+          話す "Word にして" | tee 出力/Word答え
+          grep -F '{"running":"📄 出力/報告.docx を作っています"}' 出力/Word答え
+          grep -F '{"tool":{"name":"make_document","path":"出力/報告.docx","format":"docx","output":"📄 出力/報告.docx を作りました(' 出力/Word答え
+          grep -F '{"files":[{"path":"出力/報告.docx","size":' 出力/Word答え
+          curl -s -o 出力/落とした.docx "$B/api/conversations/1/files/%E5%87%BA%E5%8A%9B/%E5%A0%B1%E5%91%8A.docx"
+          unzip -p 出力/落とした.docx word/document.xml | grep -F '日本語の本文です。'
+          # PDF(path を省くと 出力/題.pdf)。?view=1 ならブラウザで開く
+          話す "PDF にして" | tee 出力/PDF答え
+          grep -F '{"tool":{"name":"make_document","path":"出力/四半期の報告.pdf","format":"pdf","output":"📄 出力/四半期の報告.pdf を作りました(1 ページ・' 出力/PDF答え
+          grep -F '{"files":[{"path":"出力/四半期の報告.pdf","size":' 出力/PDF答え
+          P="$B/api/conversations/1/files/%E5%87%BA%E5%8A%9B/%E5%9B%9B%E5%8D%8A%E6%9C%9F%E3%81%AE%E5%A0%B1%E5%91%8A.pdf"
+          curl -s -D - -o 出力/落とした.pdf "$P?view=1" | grep -F 'Content-Disposition: inline;'
+          pdftotext 出力/落とした.pdf - | grep -F '売上'
+          pdffonts 出力/落とした.pdf | grep -F 'Noto-Sans-CJK-JP'
+          # 作業フォルダの外には作らない
+          話す "外に作って" | grep -F '"output":"../外.docx を作れませんでした: path に .. や . で始まる名前は使えません: ../外.docx","code":1}'
+          [ ! -e 出力/作業D/外.docx ]
+          # 作ったと書いただけなら頼み直し、モデルが道具で作る
+          docker exec ohanashi-8093-1 rm /work/出力/報告.docx
+          話す "作ったふりをして" | tee 出力/ふり答え
+          grep -F '{"notice":"⚠ モデルがファイルを作ったと書きましたが、作業フォルダにファイルができていないので、道具で作るように頼み直しています…"}' 出力/ふり答え
+          grep -F '{"files":[{"path":"出力/報告.docx","size":' 出力/ふり答え
+          # 頼み直しても作らなければ知らせる(頼み直すのは1回だけ)
+          話す "作ったふりをして言い張って" | tee 出力/言い張り答え
+          [ "$(grep -c '道具で作るように頼み直しています' 出力/言い張り答え)" = 1 ]
+          grep -F '{"notice":"⚠ ファイルはできていません。答えに書いてあるファイルは、この答えの中で作業フォルダに作られていません。"}' 出力/言い張り答え
+          ! grep -F '"files"' 出力/言い張り答え
+          curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
+          kill %1 %2
+      - name: 記録を出す(失敗したとき)
+        if: failure()
+        run: |
+          cat 出力/アプリ.log || true
+          cat 出力/偽Ollama.log || true

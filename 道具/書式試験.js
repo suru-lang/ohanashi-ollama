@@ -21,6 +21,9 @@ const 例 = [
   // HTML と危ないリンクは文字のまま
   ['<img src=x onerror="alert(1)">', "<p>&lt;img src=x onerror=&quot;alert(1)&quot;&gt;</p>"],
   ["[x](javascript:alert(1))", "<p>[x](javascript:alert(1))</p>"],
+  // 作業フォルダのファイルへのリンク(同じ所の道)。ほかの / で始まる道は文字のまま
+  ["📄 [報告.docx](/api/conversations/3/files/%E5%87%BA/a.docx)(24KB)", '<p>📄 <a href="/api/conversations/3/files/%E5%87%BA/a.docx" target="_blank" rel="noopener">報告.docx</a>(24KB)</p>'],
+  ["[x](/api/rules)", "<p>[x](/api/rules)</p>"],
   ['[x](https://a.example/" onmouseover="alert(1))', '<p>[x](<a href="https://a.example/&quot;" target="_blank" rel="noopener noreferrer">https://a.example/&quot;</a> onmouseover=&quot;alert(1))</p>'],
 ];
 

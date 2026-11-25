@@ -4,6 +4,7 @@
 #   ./起動.sh [--watch 秒] [--] [ohanashi-ollama の引数…]
 #
 # - 画面の ⚙ の「最新にして再起動」を押すと、git pull → kumu 作る → 動かし直す、をします。
+# - Docker があれば、砂場/ が変わったときに、文書を作れる砂場のイメージ ohanashi-sandbox も作り直します。
 # - --watch 秒 を付けると、その秒ごとに git fetch して、追っている枝(main など)に
 #   新しいコミットがあれば、同じように更新します(マージしたら手元のアプリが新しくなる)。
 # - 作り直しに失敗したときは、前のアプリを動かしたままにして、画面に理由を出します。
@@ -74,7 +75,22 @@ update() {
     state "失敗: kumu 作る に失敗しました(起動.sh の画面を見てください)"
     return 1
   fi
+  sandbox_image
   state ""
+}
+
+# 砂場/ が変わっていたら、文書を作れる砂場のイメージ ohanashi-sandbox を作り直す(Docker がなければ飛ばす)。
+# 失敗しても、アプリは前のイメージ(なければ python:3.12-slim)で動かす
+sandbox_image() {
+  command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1 || return 0
+  sum=$(cat 砂場/* | cksum)
+  if [ "$sum" = "$(cat 出力/砂場.sum 2>/dev/null)" ] && docker image inspect ohanashi-sandbox >/dev/null 2>&1; then return 0; fi
+  log "砂場のイメージ ohanashi-sandbox を作ります(はじめは数分かかります)"
+  if docker build -t ohanashi-sandbox 砂場 >&2; then
+    printf '%s\n' "$sum" > 出力/砂場.sum
+  else
+    log "ohanashi-sandbox を作れませんでした。文書(Word・PDF)を作る道具は使えません"
+  fi
 }
 
 # 追っている枝に、手元にないコミットがあれば 真

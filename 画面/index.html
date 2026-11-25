@@ -76,6 +76,14 @@
       <label class="並び">温度 <input id="温度" type="range" min="0" max="2" step="0.1" value="0.8" disabled> <output id="温度値">0.8</output></label>
     </div>
     <label class="並び" id="砂場網欄" hidden><input id="砂場網" type="checkbox"> 💻 砂場からインターネットにつなぐ(pip install・apt-get install を使えるようにする)</label>
+    <details id="作業欄" hidden>
+      <summary class="欄名">📁 作業フォルダ(この会話の砂場のファイル。押すと落とせます)</summary>
+      <div class="行 決まり行">
+        <span id="作業様子" class="淡 小字"></span>
+        <button id="作業読直" type="button" class="小">読み直す</button>
+      </div>
+      <ul id="作業一覧"></ul>
+    </details>
     <div id="倉欄" hidden>
       <span class="欄名">🐙 GitHub のリポジトリ(この会話で読むもの)</span>
       <ul id="倉一覧"></ul>
