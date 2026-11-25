@@ -319,6 +319,13 @@ button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
   select { max-width: 35%; }
 }
 
+/* --- 作業フォルダ --- */
+#作業欄 { font-size: 0.9rem; }
+#作業欄 summary { cursor: pointer; }
+#作業一覧 { list-style: none; margin: 4px 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+#作業一覧 li { display: flex; gap: 8px; padding: 2px 0; overflow-wrap: anywhere; }
+#作業一覧 .淡 { margin-left: auto; white-space: nowrap; }
+
 /* --- モデル帳 --- */
 #帳欄 { font-size: 0.9rem; }
 #帳欄 summary { cursor: pointer; }

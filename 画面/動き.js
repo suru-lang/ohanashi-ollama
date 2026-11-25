@@ -6,6 +6,7 @@
 // 出典は答えの終わりに Markdown の番号付きの一覧として足して、答えといっしょに保存します。
 // {"code":true} も送ると、モデルが砂場(Docker のコンテナ)でコマンドを動かします。動かす前に {"running":…}、
 // 動かした後に {"tool":…} が届くので、コマンドと出力を答えの中に Markdown のコードの塊として足します。
+// 答えの中で作業フォルダにファイルができると、終わりに {"files":[{"path":…,"size":…}]} が届くので、落とせるリンクの「📄 」の行を足します。
 // {"github":true} も送ると、モデルが会話のリポジトリ(⚙ で足す。Read か Write)を GitHub から読みます。
 // Write のリポジトリには、モデルが確かめずに issue を書きます(github_issue)。
 // 読む前に {"running":…}、読んだ後に {"tool":{"name":"github_…","summary":…}} が届き、summary の1行を答えに残します。
@@ -560,8 +561,65 @@ function 道具跡文(t) {
     return `\n\n📝 \`${t.path}\`(${t.output})\n\n${囲}${言語}\n${(t.content || "").replace(/\n$/, "")}\n${囲}\n\n`;
   }
   if ((t.name || "").startsWith("github_")) return `\n\n${t.summary || t.name}\n\n`;
+  if (t.name === "make_document") return `\n\n${t.code ? "⚠ " : ""}${t.output || ""}\n\n`;
   return `\n\n${t.name}: ${t.output || ""}\n\n`;
 }
+
+// --- 作業フォルダのファイル ---
+
+// 作業フォルダのファイルの道(部品ごとに符号化する。( ) はリンクの書き方を壊さないように %28 %29 にする)。PDF と画像はブラウザで開く
+function 作業道(会話番号, 道) {
+  const 符 = 道.split("/").map((p) => encodeURIComponent(p).replace(/[!'()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase())).join("/");
+  const 見る = /\.(pdf|png|jpe?g|gif|webp)$/i.test(道);
+  return `/api/conversations/${会話番号}/files/${符}${見る ? "?view=1" : ""}`;
+}
+
+function ファイル大きさ文(n) {
+  if (n < 1024) return `${n} バイト`;
+  if (n < 1048576) return `${Math.ceil(n / 1024)}KB`;
+  return `${(n / 1048576).toFixed(1)}MB`;
+}
+
+// 答えの中で作業フォルダにできた・変わったファイルを、落とせるリンクの行にする(「📄 」の行は、次にモデルへ送るときに除く)
+function ファイル文(会話番号, 群) {
+  if (!会話番号 || !群 || !群.length) return "";
+  const 行 = 群.map((f) => {
+    const 名 = (f.path.split("/").pop() || f.path).replace(/[\[\]]/g, (c) => (c === "[" ? "［" : "］"));
+    return `📄 [${名}](${作業道(会話番号, f.path)})(${ファイル大きさ文(f.size || 0)})`;
+  });
+  return "\n\n" + 行.join("\n") + "\n";
+}
+
+// ⚙ の「📁 作業フォルダ」: 開いたときに一覧を読む
+async function 作業一覧読込() {
+  const 欄 = $("作業一覧"), 様子 = $("作業様子");
+  欄.textContent = "";
+  if (!今) { 様子.textContent = "会話を始めると、砂場で作ったファイルがここに出ます。"; return; }
+  様子.textContent = "読んでいます…";
+  let r;
+  try { r = await API(`conversations/${今.id}/files`); } catch (e) { 様子.textContent = `読めませんでした(${e.message})`; return; }
+  const 群 = r.files || [];
+  様子.textContent = 群.length ? `作業/${今.id} の ${群.length} 個${r.truncated ? "(多いので、はじめの分だけ)" : ""}` : "まだファイルはありません。";
+  for (const f of 群) {
+    const li = document.createElement("li");
+    if (f.dir) {
+      li.textContent = `📦 ${f.path}/(clone したリポジトリ)`;
+    } else {
+      const a = document.createElement("a");
+      a.href = 作業道(今.id, f.path);
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = `📄 ${f.path}`;
+      const 量 = document.createElement("span");
+      量.className = "淡";
+      量.textContent = ファイル大きさ文(f.size);
+      li.append(a, 量);
+    }
+    欄.append(li);
+  }
+}
+$("作業欄").addEventListener("toggle", () => { if ($("作業欄").open) 作業一覧読込(); });
+$("作業読直").addEventListener("click", 作業一覧読込);
 
 // 出典を答えの終わりに足す Markdown。題の [ ] と URL の ( ) は、リンクの書き方を壊さないように替える
 function 出典文(群) {
@@ -971,6 +1029,7 @@ async function 答えてもらう() {
   中断 = new AbortController();
   送受中にする(true);
   const 番号 = 筋.id; // 答えている間にほかのスレッドを開いても、このスレッドにしまう
+  const 会話番号 = 筋.conversation;
   const 描く = () => {
     描く予定 = false;
     const 今の題 = !待つ ? "" : 様子 || (考え && !答え ? "考えています…" : "");
@@ -987,6 +1046,7 @@ async function 答えてもらう() {
     if (通知.sources) { 出典 = 通知.sources; 調べ欄.textContent = `🌐 ウェブの ${出典.length} 件を読みました`; }
     if (通知.notice) 調べ欄.textContent = `${通知.notice}`;
     if (通知.running) 様子 = 通知.running.startsWith("🐙") ? 通知.running : `💻 動かしています: ${通知.running}`;
+    if (通知.files) 答え = 柵閉じ(答え) + ファイル文(会話番号, 通知.files);
     if (通知.tool) { 答え = 柵閉じ(答え) + 道具文(通知.tool); 様子 = (通知.tool.name || "").startsWith("github_") ? 通知.tool.summary : "💻 砂場で動かしました"; }
     if (!調べ欄.isConnected && 通知.notice) el.prepend(調べ欄);
     if (!描く予定) { 描く予定 = true; requestAnimationFrame(描く); }
@@ -1367,6 +1427,7 @@ $("帳調べ直す").addEventListener("click", () => 帳調べ直す(""));
       砂場ボタン.title = "押してあると、モデルが砂場(Docker のコンテナ)でコードを書いて動かします";
       砂場切替(保存値("砂場", "") === "1");
       $("砂場網欄").hidden = false;
+      $("作業欄").hidden = false;
     }
     起動時 = i.started;
     if (i.restart) { $("更新欄").hidden = false; 版表示(i); }

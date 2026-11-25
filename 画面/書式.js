@@ -1,6 +1,6 @@
 // LLM の答えの Markdown を HTML にする小さな変換。
 // 先に全部の文字を HTML として逃がしてから印を付けるので、答えの中の HTML はそのまま文字として出ます。
-// 扱うもの: ``` のコード、`コード`、見出し、箇条書き(- * + と 1.)、引用、表、横線、**太字**、*斜体*、~~消し線~~、リンク(http・https だけ)。
+// 扱うもの: ``` のコード、`コード`、見出し、箇条書き(- * + と 1.)、引用、表、横線、**太字**、*斜体*、~~消し線~~、リンク(http・https と、作業フォルダのファイル /api/conversations/番号/files/… だけ)。
 
 (function () {
   function 逃がす(s) {
@@ -14,6 +14,8 @@
       if (i % 2 === 1) return "<code>" + 逃がす(p.replace(/^`+|`+$/g, "")) + "</code>";
       let t = 逃がす(p);
       t = t.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      // 砂場の作業フォルダのファイル(答えの終わりの「📄 」の行)。この画面と同じ所の道だけ
+      t = t.replace(/\[([^\]]+)\]\((\/api\/conversations\/\d+\/files\/[^\s)"]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
       t = t.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
       t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
       t = t.replace(/__([^_]+)__/g, "<strong>$1</strong>");

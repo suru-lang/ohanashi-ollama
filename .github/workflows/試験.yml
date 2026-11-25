@@ -303,6 +303,10 @@ jobs:
           grep -F '{"tool":{"name":"run","command":"python hello.py","output":"こんにちは\n","code":0}}' 出力/砂場答え
           grep -F '"path":"hello.py"' 出力/砂場答え
           [ "$(cat 出力/作業/1/hello.py)" = "print('こんにちは')" ]
+          # 答えの中でできたファイルは、終わりに {"files":…} で知らせる。ohanashi-sandbox がないので、文書の道具は渡さない
+          grep -F '{"files":[{"path":"hello.py","size":25}]}' 出力/砂場答え
+          grep -F 'docker build -t ohanashi-sandbox 砂場' 出力/アプリ3.log
+          curl -s $B/api/info | grep -F '"documents":false'
           # 道具の結果がモデルに返り、もう一度答える(偽の Ollama は道具の結果をおうむ返しする)
           [ "$(grep -o '"content":"[^"]*"' 出力/砂場答え | grep -v print | sed 's/"content":"//; s/"$//' | tr -d '\n')" = "書いて動かします。おうむ返し: こんにちは\n\n(終了コード 0)" ]
           docker ps --format '{{.Names}}' | grep -x ohanashi-8092-1
@@ -324,6 +328,30 @@ jobs:
           curl -s -X POST -d '{"role":"user","content":"次は"}' $B/api/conversations/1/messages > /dev/null
           curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat > 出力/決まり次
           grep -o '"content":"[^"]*"' 出力/決まり次 | sed 's/"content":"//; s/"$//' | tr -d '\n' | grep -F 'おうむ返し: 次は [指示: # リポジトリ q の決まり(/work/q/OHANASHI.md)\nQ の決まり]'
+          # 作業フォルダのファイル: 一覧(clone したリポジトリはフォルダの名前だけ)と中身。外は 403、隠しは 404、ほかのサイトからは 403
+          curl -s -X POST -d '{"role":"user","content":"ファイルを書いて"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat | tee 出力/ファイル答え
+          grep -F '{"files":[{"path":"出力/a (1).txt","size":4}]}' 出力/ファイル答え
+          curl -s $B/api/conversations/1/files | tee 出力/ファイル一覧
+          grep -F '{"path":"hello.py","size":25,' 出力/ファイル一覧
+          grep -F '{"path":"q","size":0,' 出力/ファイル一覧
+          grep -F '"path":"出力/a (1).txt","size":4,' 出力/ファイル一覧
+          ! grep -F 'OHANASHI.md' 出力/ファイル一覧
+          [ "$(curl -s "$B/api/conversations/1/files/%E5%87%BA%E5%8A%9B/a%20%281%29.txt")" = "あ" ]
+          curl -s -D - -o /dev/null $B/api/conversations/1/files/hello.py | tee 出力/ファイル見出し
+          grep -F "Content-Disposition: attachment; filename*=UTF-8''hello.py" 出力/ファイル見出し
+          grep -F 'Content-Security-Policy: sandbox' 出力/ファイル見出し
+          [ "$(curl -s -o /dev/null -w '%{http_code}' --path-as-is $B/api/conversations/1/files/%2E%2E/%2E%2E/砂場.db)" = 403 ]
+          ln -s /etc/passwd 出力/作業/1/外
+          [ "$(curl -s -o /dev/null -w '%{http_code}' $B/api/conversations/1/files/%E5%A4%96)" = 403 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' $B/api/conversations/1/files/q/.git)" = 404 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Origin: http://evil.example' $B/api/conversations/1/files)" = 403 ]
+          # 道具を使わずに「作成しました」と書くと、一度だけ頼み直す(文書の道具がないので、偽の Ollama はまだ作っていないと答える)
+          curl -s -X POST -d '{"role":"user","content":"作ったふりをして"}' $B/api/conversations/1/messages > /dev/null
+          curl -s -X POST -d '{"conversation":1,"code":true}' $B/api/chat | tee 出力/ふり答え
+          grep -F '{"notice":"⚠ モデルがファイルを作ったと書きましたが、作業フォルダにファイルができていないので、道具で作るように頼み直しています…"}' 出力/ふり答え
+          grep -F '"content":"すみません、まだ作っていません"' 出力/ふり答え
+          ! grep -F 'ファイルはできていません' 出力/ふり答え
           # 会話を消すとコンテナも消える
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
           ! docker ps -a --format '{{.Names}}' | grep -x ohanashi-8092-1
