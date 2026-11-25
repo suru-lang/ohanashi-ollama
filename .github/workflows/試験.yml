@@ -48,6 +48,7 @@ jobs:
           node 道具/書式試験.js
           node 道具/道試験.js
           node 道具/頁試験.js
+          node 道具/通知試験.js
       - name: 偽の Ollama を相手に動かす
         run: |
           ~/go/bin/kumu 作る

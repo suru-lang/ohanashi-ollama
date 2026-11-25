@@ -15,6 +15,7 @@
 // 決まり(モデルに守ってほしいことを書いた文書)は api/rules でしまい、⚙ で会話に付けます(会話の rules に番号を順に)。
 // サーバーは、付けた決まりと会話の指示を1つの指示(system)にまとめて送ります。砂場か GitHub を使う答えでは、
 // 作業フォルダのリポジトリの OHANASHI.md・AGENTS.md・CLAUDE.md も読み、読んだときは {"notice":…} で知らせます。
+// 画面を見ていない間に答えが終わったら、タブの題の頭に「✅ 」(失敗は「⚠️ 」)を付け、⚙ で入れていればブラウザの通知も出します(通知.js)。
 
 const $ = (id) => document.getElementById(id);
 const 会話欄 = $("会話");
@@ -45,6 +46,8 @@ let おすすめ = {};      // モードごとのおすすめ {会話: {name, re
 let 新規モード = 保存値("モード", "会話") === "コーディング" ? "コーディング" : "会話"; // まだ会話を作っていないときのモード
 let モデル手動 = false; // まだ会話を作っていないときに、モデルを選び直したか(選び直したら、おすすめより優先)
 let ウェブ可 = false;   // ウェブ検索が使えるか(モデル帳を調べ直せるか)
+let 題印 = "";         // タブの題の頭の印(「✅ 」など)。見ていない間に答えが終わったら付け、見たら外す
+let 出した通知 = [];    // 出しているブラウザの通知。見たら閉じる
 
 // --- サーバーとのやりとり ---
 
@@ -412,7 +415,7 @@ function 会話題表示() {
   $("新スレッド").hidden = !今;
   if (今 && !$("会話題").isContentEditable) $("会話題").textContent = 今.title || "新しい会話";
   if (!題欄.isContentEditable) 題欄.textContent = 見出し題();
-  document.title = 今 ? `${見出し題()}${今.title && 今.title !== 見出し題() ? ` - ${今.title}` : ""} - おはなし` : "おはなし";
+  document.title = 題印 + (今 ? `${見出し題()}${今.title && 今.title !== 見出し題() ? ` - ${今.title}` : ""} - おはなし` : "おはなし");
 }
 
 function 表示し直す() {
@@ -1030,6 +1033,7 @@ async function 答えてもらう() {
   送受中にする(true);
   const 番号 = 筋.id; // 答えている間にほかのスレッドを開いても、このスレッドにしまう
   const 会話番号 = 筋.conversation;
+  const 題 = 筋題(筋);
   const 描く = () => {
     描く予定 = false;
     const 今の題 = !待つ ? "" : 様子 || (考え && !答え ? "考えています…" : "");
@@ -1082,6 +1086,7 @@ async function 答えてもらう() {
   中断 = null;
   送受中にする(false);
   if (誤り) 失敗を出す(誤り, !答え);
+  終わりを知らせる({ 題, 答え, 誤り, 止めた, 会話: 会話番号, スレッド: 番号 });
   await 会話読み直す();
   一覧読込();
   文欄.focus();
@@ -1225,6 +1230,70 @@ async function 作り直す() {
   const 最後 = [...会話欄.querySelectorAll(".発言")].at(-1);
   if (最後 && 最後.classList.contains("assistant")) 最後.remove();
   await 答えてもらう();
+}
+
+// --- 答えが終わったら知らせる ---
+// 見ていない(タブが隠れている・窓にフォーカスがない)間に答えが終わったら、タブの題に印を付け、
+// ⚙ で入れていればブラウザの通知を出す。通知は安全な場所(localhost か https)でだけ使える
+
+function 見ていない() { return document.hidden || !document.hasFocus(); }
+function 通知を使える() { return "Notification" in window && window.isSecureContext; }
+function 通知中() { return 通知を使える() && Notification.permission === "granted" && 保存値("通知", "") === "1"; }
+
+function 通知欄表示(案内) {
+  const 使える = 通知を使える();
+  $("通知").disabled = !使える;
+  $("通知").checked = 通知中();
+  let 文 = 案内 || "";
+  if (!使える) 文 = "通知は、localhost か https で開いたときだけ使えます(ほかの機械から http で開くと使えません)。タブの題の印は付きます";
+  else if (保存値("通知", "") === "1" && Notification.permission === "denied") 文 = "ブラウザが、このページの通知を止めています。ブラウザの設定で、このサイトの通知を許してください";
+  $("通知案内").textContent = 文;
+  $("通知案内").hidden = !文;
+}
+
+$("通知").addEventListener("change", async () => {
+  if (!$("通知").checked) { 保存する("通知", ""); 通知欄表示(); return; }
+  if (!通知を使える()) { 通知欄表示(); return; }
+  let 許し = Notification.permission;
+  if (許し === "default") {
+    try { 許し = await Notification.requestPermission(); } catch { 許し = "denied"; }
+  }
+  if (許し === "granted") { 保存する("通知", "1"); 通知欄表示("見ていない間に答えが終わると、通知します"); return; }
+  保存する("通知", "");
+  通知欄表示("通知を許されませんでした。ブラウザの設定で、このサイトの通知を許してください");
+});
+
+function 題印を付ける(印) {
+  題印 = 印;
+  document.title = 印を付ける(document.title, 印);
+}
+
+// 見たら、印を外して通知を閉じる
+function 見た() {
+  if (見ていない()) return;
+  if (題印) 題印を付ける("");
+  for (const n of 出した通知) n.close();
+  出した通知 = [];
+}
+document.addEventListener("visibilitychange", 見た);
+window.addEventListener("focus", 見た);
+
+function 終わりを知らせる(様子) {
+  if (!見ていない()) return;
+  const 中身 = 通知の中身(様子);
+  if (!中身) return;
+  題印を付ける(中身.印);
+  if (!通知中()) return;
+  try {
+    const n = new Notification(中身.題, { body: 中身.本文, tag: `ohanashi-${様子.スレッド}`, icon: "するぞう.svg" });
+    n.onclick = () => {
+      window.focus();
+      location.hash = 道を作る(様子.会話, 様子.スレッド);
+      n.close();
+    };
+    n.onclose = () => { 出した通知 = 出した通知.filter((x) => x !== n); };
+    出した通知.push(n);
+  } catch { /* Android の Chrome などは、ページから通知を作れない。印だけにする */ }
 }
 
 // --- 入力欄 ---
@@ -1452,6 +1521,7 @@ $("帳調べ直す").addEventListener("click", () => 帳調べ直す(""));
       ウェブ切替(保存値("ウェブ", "") === "1");
     }
   }).catch(() => {});
+  通知欄表示();
   await モデル読込();
   await 決まり読込();
   if (location.hash) 道から開く();
