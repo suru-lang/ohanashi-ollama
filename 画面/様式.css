@@ -239,6 +239,55 @@ textarea {
   line-height: 1.5;
 }
 
+/* --- 添えるもの --- */
+#添付欄 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px max(16px, calc((100% - 820px) / 2)) 0;
+  border-top: 1px solid var(--線);
+  background: var(--面);
+}
+#添付欄:not([hidden]) + form { border-top: none; }
+.添付 {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 260px;
+  min-height: 56px;
+  padding: 6px 30px 6px 8px;
+  border: 1px solid var(--線);
+  border-radius: 10px;
+  background: var(--地);
+  font-size: 0.85rem;
+}
+.添付 img { height: 64px; max-width: 160px; object-fit: cover; border-radius: 6px; }
+.添付 .名 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.添付 .様子 { color: var(--淡); }
+.添付.誤り { border-color: var(--誤); }
+.添付.誤り .様子 { color: var(--誤); }
+.添付 .外す { position: absolute; top: 4px; right: 4px; padding: 0 6px; border: none; background: none; line-height: 1.4; }
+.添付注意 { flex-basis: 100%; }
+#落とし覆い {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.35);
+  pointer-events: none;
+}
+#落とし覆い > div { padding: 28px 36px; border: 3px dashed var(--主); border-radius: 16px; background: var(--面); font-weight: bold; }
+.添付列 { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px; margin-top: 6px; }
+.発言.user { display: flex; flex-direction: column; align-items: flex-end; }
+.発言.user .添付列 { justify-content: flex-end; }
+.添付列 .絵 img { display: block; max-height: 160px; max-width: 240px; border-radius: 10px; border: 1px solid var(--線); }
+.添付列 .札 { padding: 4px 10px; border: 1px solid var(--線); border-radius: 10px; background: var(--面); color: var(--字); text-decoration: none; font-size: 0.85rem; }
+.添付列 .札:hover { border-color: var(--淡); }
+.発言.user .本文:empty { display: none; }
+
 /* ウェブで調べるかどうかの切り替え。押してある間は色を付ける */
 button.切替 { white-space: nowrap; }
 button.切替[aria-pressed="true"] { background: var(--主); color: var(--主字); border-color: var(--主); }
@@ -255,6 +304,10 @@ button.切替:disabled { opacity: 0.45; cursor: not-allowed; }
   .発言, .発言.assistant, .失敗 { max-width: 100%; width: auto; }
   .発言.assistant { width: 100%; }
   button.切替 .字, #新スレッド .字 { display: none; }
+  /* 入力欄は1行目いっぱいに、ボタンはその下に並べる */
+  form { flex-wrap: wrap; }
+  #文 { flex-basis: 100%; order: -1; }
+  #送る, #止める { margin-left: auto; }
   #会話題 { display: none !important; }
   .道具 button { opacity: 1; }
   .項目 .消す { visibility: visible; }

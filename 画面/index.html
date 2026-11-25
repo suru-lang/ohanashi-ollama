@@ -20,6 +20,7 @@
   <div id="接続先" class="淡"></div>
 </aside>
 <div id="覆い" hidden></div>
+<div id="落とし覆い" hidden><div>ここに落とすと、画像・PDF・文字のファイルを問いに添えます</div></div>
 <div id="本面">
   <header>
     <button id="横欄開く" type="button" class="小 携帯のみ" aria-label="会話の一覧">☰</button>
@@ -94,7 +95,10 @@
       <p>ローカルの Ollama とおしゃべりします。<br>下の欄に書いて Enter で送ります(Shift+Enter で改行)。</p>
     </div>
   </main>
+  <div id="添付欄" hidden aria-label="添えるもの"></div>
   <form id="入力欄">
+    <button id="添付ボタン" type="button" class="切替" aria-label="画像・PDF・文字のファイルを添える" title="画像・PDF・文字のファイルを添えます(画面に落とす・入力欄に貼るでも添えられます)">📎</button>
+    <input id="添付選択" type="file" multiple hidden accept="image/*,application/pdf,.pdf,text/*,.md,.csv,.tsv,.json,.yaml,.yml,.toml,.xml,.py,.js,.ts,.go,.rs,.c,.h,.cpp,.java,.sh,.sql,.suru">
     <textarea id="文" rows="1" placeholder="メッセージを書く" autofocus></textarea>
     <button id="ウェブ" type="button" class="切替" aria-label="ウェブで調べる" aria-pressed="false" disabled title="起動するときに SEARXNG_URL か OLLAMA_API_KEY を設定すると、ウェブで調べてから答えます">🌐<span class="字"> ウェブ</span></button>
     <button id="砂場" type="button" class="切替" aria-label="砂場でコードを動かす" aria-pressed="false" disabled title="Docker が使えると、モデルが砂場(コンテナ)でコードを書いて動かします">💻<span class="字"> 砂場</span></button>
@@ -106,5 +110,6 @@
 <script src="書式.js"></script>
 <script src="道.js"></script>
 <script src="動き.js"></script>
+<script src="添付.js"></script>
 </body>
 </html>
