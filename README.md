@@ -16,6 +16,7 @@
 - 答えの速さ(トークン/秒)を出します
 - 「🌐 ウェブ」を押しておくと、ウェブで調べてから答えます。答えの終わりに出典が付きます(自分で動かす SearXNG か、Ollama の API キーが要ります)
 - 「🐙 GitHub」を押しておくと、モデルが会話に足した GitHub のリポジトリ(設定・ファイルの一覧・ファイル・issue と PR)を読んでから答えます。リポジトリは会話ごとに ⚙ の設定で足し、「読むだけ」か「読み書き」を選びます。読み書きのリポジトリには、頼めば issue を作る・直す・コメントする・閉じることや、「💻 砂場」で clone して直したものを push して PR を作ることもできます
+- 画像・PDF・文字のファイルを、画面に落とす・入力欄に貼る・📎 で選ぶ、で問いに添えられます。画像は見えるモデル(qwen2.5vl・gemma3 など)が読み、PDF と文字のファイルは文を取り出して、どのモデルにも読ませます
 - スマートフォンの幅でも使えます。暗い色の設定にも合わせます
 
 ## 動かし方
@@ -97,6 +98,17 @@ kumu 実行 -- --port 9000 --db ~/おはなし.db
 ```
 
 答えの途中で `github_clone` や `run` の `git clone` で clone したときも、道具を使ったあとに探し直して、見つかればモデルに渡します。読んだときは、答えの上に「リポジトリの決まりを読みました: r/OHANASHI.md」と出します(スレッドの最初の答えと、答えの途中で見つけたときだけ)。
+
+### 画像と PDF を添える
+
+画面にファイルを落とすか、入力欄に貼るか(Ctrl+V・⌘V)、入力欄の左の 📎 で選ぶと、入力欄の上に並びます。✕ で外せます。書いて送ると、問いといっしょに送ります(添えるだけで、書かずに送ることもできます)。
+
+- **画像**(PNG・JPEG・WebP・GIF など、ブラウザが読めるもの)は、長い辺 1600px までに縮めて JPEG(透明があれば PNG)にしてから送ります。1つの問いに 8 枚まで。読めるのは、画像を扱えるモデル(`ollama pull qwen2.5vl` や `gemma3` など)だけです。画像を扱えないモデルでは、Ollama が断るか、画像を見ずに答えます
+- **PDF** は、ブラウザでページごとに文を取り出して(「--- 3 ページ ---」で区切る)送ります。20MB まで。スキャンした PDF のように文字のないページは、札に「2 ページは文字がありません」と出ます(そのページは読めません)
+- **文字のファイル**(`.txt`・`.md`・`.csv`・`.json`・コードなど)は、そのまま送ります。5MB まで
+- 添える文は、1つの問いで合わせて 10 万字まで。8000 字を超えると、モデルの文脈に入りきらないかもしれないと知らせます
+
+送った問いの下には、画像を小さく、PDF などを「📄 報告.pdf(12 ページ・3.4 万字)」の札で出します。押すと、画像そのものや取り出した文を開けます。添えたものは会話帳にしまい、そのスレッドで続けて聞いても、毎回モデルに送り直します(Ollama は前の画像を覚えていないため)。
 
 ### ウェブで調べる
 
@@ -245,7 +257,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | [GitHub作業.suru](GitHub作業.suru) | 砂場の作業フォルダに clone し、変えたものを commit して push する道具(git は手元で動かす) |
 | [設定.suru](設定.suru) | 起動の引数と `OLLAMA_HOST`・`OLLAMA_API_KEY`・`SEARXNG_URL`・`GITHUB_TOKEN` |
 | [起動.sh](起動.sh) | 作って動かし、画面から頼まれたときや新しいコミットがあるときに更新して動かし直す |
-| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道) |
+| [画面/](画面/) | HTML・CSS・JavaScript(`書式.js` は Markdown の変換、`道.js` は `#会話/スレッド` の道、`添付.js` は画像・PDF を添えるところ) |
+| [画面/外/pdfjs/](画面/外/pdfjs/) | PDF の文を取り出す [pdf.js](https://github.com/mozilla/pdf.js)(pdfjs-dist 4.10.38 の `legacy/build/pdf.min.mjs`・`pdf.worker.min.mjs` と `cmaps/`。Apache-2.0、[LICENSE](画面/外/pdfjs/LICENSE)) |
 
 依存は [suru-lang/http](https://github.com/suru-lang/http)(HTTP・WebSocket・HTTP と HTTPS のクライアント)と [suru-lang/sqlite](https://github.com/suru-lang/sqlite) と [suru-lang/github](https://github.com/suru-lang/github)(GitHub の API)と [suru-lang/ollama](https://github.com/suru-lang/ollama)(Ollama の API)です。
 
@@ -264,7 +277,8 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 | `GET・PUT・DELETE /api/rules/番号` | 決まりの中身 `{"id":…,"name":…,"content":…,"default":真偽}` を読む・変える(本文にある項目だけ)・消す(付けている会話から外れる) |
 | `GET・POST /api/conversations/番号/threads` | スレッドの一覧・スレッドを作る `{"title":…}`(省ける) |
 | `GET・PUT・DELETE /api/threads/番号` | スレッドの中身 `{"id":…,"conversation":…,"title":…,"messages":[…]}` を読む・題を変える・消す(会話の最後のスレッドは消せない) |
-| `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}` |
+| `POST /api/threads/番号/messages` | 発言を足す `{"role":"user"か"assistant","content":…}`。問いには `"attachments":[{"kind":"image","name":…,"type":"image/jpeg","data":"base64…"}, {"kind":"text","name":…,"type":…,"text":…,"pages":…}]` を添えられる。スレッドの中身の発言には、添えたものの目録 `"attachments":[{"id":…,"kind":…,"name":…,"type":…,"pages":…,"chars":…}]` が付く |
+| `GET /api/attachments/番号` | 添えたもの。画像はそのファイル、文書は取り出した文(`text/plain`) |
 | `DELETE /api/threads/番号/last-answer` | 最後の答えを消す(作り直すとき) |
 | `POST /api/conversations/番号/messages`・`DELETE /api/conversations/番号/last-answer` | 前の版の道。会話の一番新しく作ったスレッドに発言を足す・最後の答えを消して、スレッドの中身を返す |
 | `GET /ws`(WebSocket) | `{"thread":番号}` が届くたびに、そのスレッドの発言を会話の設定で Ollama へ送り、答えを流す(`{"conversation":番号}` だけなら、その会話の一番新しいスレッド)。`"summary":true` なら、スレッドのまとめを流す(しまわない)。`"web":true` も付いていれば、先にウェブで調べる。`"code":true` なら砂場の道具を、`"github":true` なら GitHub の道具を渡す |
@@ -390,12 +404,23 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 3. **道具を回すのはこのアプリで。** 道具の回数の上限、画面への `{"running"}`・`{"tool"}`、頼み直しは、砂場と画面に絡むので、ライブラリには入れずに `本体.suru` に残しました。
 4. **失敗の文はライブラリのもの。** Ollama が `{"error":…}` を返したときの「Ollama: model 'x' not found」、つながらないときの「…/api/chat に聞けませんでした: …」は、前と同じ文です。モデルの一覧を取れなかったときの 502 の文は、ライブラリの文をそのまま使います。web 検索の鍵が違うときは「Ollama に断られました(401: …)。鍵を確かめてください」になりました。
 
+### 添付
+
+1. **画像と文書は表 `添付` に。** 問いに添えたものは、発言ごとに表 `添付`(種類・名前・MIME・中身・文・ページの数)にしまいます。発言・スレッド・会話を消すと一緒に消えます(`ON DELETE CASCADE`)。データベースの1つのファイルに収まるので、写せば持ち運べます。
+2. **画像は base64 の文字列のまましまう。** Ollama の `images` は base64 の文字列なので、送るたびに符号化し直さないように、受け取った base64 をそのまま `中身` に入れます(バイト列より 3 分の 1 ほど大きくなります)。`GET /api/attachments/番号` で見せるときだけ戻します。
+3. **画像は画面で縮めて形をそろえる。** 長い辺 1600px まで、JPEG(透明があれば PNG)にしてから送ります。データベースが重くならず、HEIC・WebP など Ollama が読めないかもしれない形もそろいます。サーバーは PNG と JPEG だけを受け付け、base64 を読めるかも確かめます。
+4. **PDF の文は画面で取り出す。** pdf.js を `画面/外/pdfjs/` に置いて、はじめて PDF を添えたときに読みます(CDN にはつながず、手元だけで動くように)。日本語の PDF のために `cmaps/` も置きました。サーバーに poppler などを入れずに済みます。元の PDF はしまわず、取り出した文とページの数だけをしまいます。
+5. **文書はモデルに送るときに問いの前に入れる。** `<file name="報告.pdf">…</file>` で囲んで、問いの前に置きます。会話帳の `内容` には人が書いた問いだけを残すので、検索の見出しやスレッドの題が PDF の文で埋まりません(添えただけで書かずに送った問いは、はじめの添付の名前を題にします)。名前の `"`・`<`・`>` は除きます。
+6. **一覧には目録だけ。** スレッドの中身の発言には添付の目録(番号・種類・名前・ページの数・字数)だけを付け、画像の中身はモデルに送るときだけ読みます。
+7. **大きさに上限。** 画像は1つの問いに 8 枚・1 つ base64 で 1400 万字(元で 10MB ほど)まで、添える文は合わせて 10 万字まで、要求の本文は 30MB までです。画面でも先に断ります。
+8. **画像は Ollama のライブラリで送る。** suru-lang/ollama 0.2.0 の `Ollama画像追加する` で、発言に `images` を付けます。
+
 ## 今後の候補
 
 - 画面のファイルを実行ファイルに入れて、どのフォルダからでも起動できるようにする
 - ウェブ検索: 言葉をモデルに作らせる(道具の呼び出し)、ページを読む `/api/web_fetch`、SearXNG の言語・カテゴリを選ぶ
 - 会話を Markdown・JSON に書き出す
-- 画像を送る(Ollama の `images`、見えるモデル)
+- 添付: 文字のない PDF のページを画像にして見えるモデルに渡す(#50)、画像を読めないモデルのときは送る前に知らせる(#51)
 - モデルを画面から入れる(`/api/pull`)、使っていないモデルを片付ける
 - 砂場: 作業フォルダのファイルを画面で見る・落とす、コマンドを動かす前に確かめる、コンテナを手元の利用者で動かす
 - 長い会話を、モデルの文脈の長さ(`num_ctx`)に合わせて切り詰める

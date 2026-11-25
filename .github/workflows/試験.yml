@@ -146,7 +146,25 @@ jobs:
           curl -s -o /dev/null -w '%{http_code}\n' -X DELETE $B/api/threads/1 | grep -x 404
           curl -s -o /dev/null -w '%{http_code}\n' $B/api/threads/999 | grep -x 404
           curl -s -X POST -d '{"thread":999}' $B/api/chat | grep -F '{"error":"その会話かスレッドはありません"}'
+          # 添付: 画像は images で、文書は問いの前に <file> で囲んで届く。スレッドには目録だけ、中身は /api/attachments から
+          T2=$(curl -s -X POST -d '{}' $B/api/conversations/1/threads | sed 's/^{"id":\([0-9]*\),.*/\1/')
+          PNG=$(printf '\211PNG\r\n\032\n' | base64)
+          curl -s -X POST -d "{\"role\":\"user\",\"content\":\"これは何\",\"attachments\":[{\"kind\":\"image\",\"name\":\"点.png\",\"type\":\"image/png\",\"data\":\"$PNG\"},{\"kind\":\"text\",\"name\":\"メ\\\"モ<.txt\",\"type\":\"text/plain\",\"text\":\"りんご\",\"pages\":0}]}" $B/api/threads/$T2/messages | tee 出力/添付スレッド
+          grep -F '"content":"これは何","attachments":[{"id":1,"kind":"image","name":"点.png","type":"image/png","pages":0,"chars":0},{"id":2,"kind":"text","name":"メモ.txt","type":"text/plain","pages":0,"chars":3}]' 出力/添付スレッド
+          curl -s -X POST -d "{\"thread\":$T2}" $B/api/chat > 出力/添付答え
+          node -e 'const t = require("fs").readFileSync("出力/添付答え", "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).content || "").join(""); if (t !== "おうむ返し: <file name=\"メモ.txt\">\nりんご\n</file>\n\nこれは何 [指示: 短く] [画像 1 枚]") { console.error(t); process.exit(1); }'
+          curl -s -o /dev/null -w '%{http_code} %{content_type}\n' $B/api/attachments/1 | grep -x '200 image/png'
+          [ "$(curl -s $B/api/attachments/2)" = りんご ]
+          curl -s -o /dev/null -w '%{http_code}\n' $B/api/attachments/99 | grep -x 404
+          # 添付だけの問いは、添付の名前が題になる。gif・読めない base64・答えへの添付は断る
+          T3=$(curl -s -X POST -d '{}' $B/api/conversations/1/threads | sed 's/^{"id":\([0-9]*\),.*/\1/')
+          curl -s -X POST -d "{\"role\":\"user\",\"content\":\"\",\"attachments\":[{\"kind\":\"image\",\"name\":\"写真.jpg\",\"type\":\"image/jpeg\",\"data\":\"$PNG\"}]}" $B/api/threads/$T3/messages | grep -F '"title":"写真.jpg"'
+          curl -s -X POST -d '{"role":"user","content":"x","attachments":[{"kind":"image","name":"a.gif","type":"image/gif","data":"AAAA"}]}' $B/api/threads/$T3/messages | grep -F '{"error":"画像は PNG か JPEG で送ってください(a.gif は image/gif)"}'
+          curl -s -o /dev/null -w '%{http_code}\n' -X POST -d '{"role":"user","content":"x","attachments":[{"kind":"image","name":"a","type":"image/png","data":"!!"}]}' $B/api/threads/$T3/messages | grep -x 400
+          curl -s -X POST -d '{"role":"assistant","content":"x","attachments":[{"kind":"text","name":"a","text":"b"}]}' $B/api/threads/$T3/messages | grep -F '{"error":"添付は問い(role が user)にだけ付けられます"}'
           curl -s -X DELETE $B/api/conversations/1 | grep -F '{"deleted":true}'
+          # 会話を消すと添付も消える
+          curl -s -o /dev/null -w '%{http_code}\n' $B/api/attachments/1 | grep -x 404
           kill %1 %2
       - name: 偽の GitHub を相手に、会話のリポジトリを読む
         run: |

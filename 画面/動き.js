@@ -351,7 +351,7 @@ function 表示し直す() {
   const 群 = 筋 ? 筋.messages : [];
   $("ようこそ").hidden = !!群.length;
   会話題表示();
-  for (const m of 群) 発言を足す(m.role, m.content);
+  for (const m of 群) 発言を足す(m.role, m.content, m.attachments);
   モデル欄表示();
   設定欄表示();
   作り直しボタン付け();
@@ -506,7 +506,7 @@ function 出典文(群) {
 
 // --- 発言の表示 ---
 
-function 発言を足す(役, 内容) {
+function 発言を足す(役, 内容, 添付群) {
   $("ようこそ").hidden = true;
   const el = document.createElement("div");
   el.className = `発言 ${役}`;
@@ -514,6 +514,7 @@ function 発言を足す(役, 内容) {
   本.className = "本文";
   el.append(本);
   中身を書く(el, 内容);
+  if (typeof 添付を出す === "function") 添付を出す(el, 添付群);
   const 道具 = document.createElement("div");
   道具.className = "道具";
   const 写 = document.createElement("button");
@@ -1057,7 +1058,9 @@ function 失敗を出す(文, 聞き直せる) {
 
 async function 送る() {
   const 質問 = 文欄.value.trim();
-  if (!質問 || 中断) return;
+  if ((!質問 && !添付待ち.length) || 中断) return;
+  let 添付;
+  try { 添付 = 送る添付(); } catch (e) { 知らせる(e.message); return; }
   try {
     if (!今) {
       if (!モデル欄.value) { 知らせる("モデルを選んでください。"); return; }
@@ -1070,14 +1073,15 @@ async function 送る() {
     }
     文欄.value = "";
     文欄高さ();
-    筋 = await API(`threads/${筋.id}/messages`, "POST", { role: "user", content: 質問 });
+    筋 = await API(`threads/${筋.id}/messages`, "POST", 添付.length ? { role: "user", content: 質問, attachments: 添付 } : { role: "user", content: 質問 });
+    添付を空にする();
     await 会話読み直す();
   } catch (e) {
     知らせる(`送れませんでした(${e.message})`);
     return;
   }
   会話題表示();
-  発言を足す("user", 質問);
+  発言を足す("user", 質問, (筋.messages.at(-1) || {}).attachments);
   一覧読込();
   await 答えてもらう();
 }
