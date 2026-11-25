@@ -107,6 +107,8 @@
       <div id="帳表"></div>
       <span class="淡 小字">点数は 0〜5(コード・会話・日本語・推論)。新しい会話のモデルは、モードの点数が高いものを選びます(選び直したモデルが優先)。手で直したものは、調べ直しても書きかえません。調べるときは、モデルの名前をウェブ検索に送ります。</span>
     </details>
+    <label class="並び" id="通知欄"><input id="通知" type="checkbox"> 🔔 見ていない間に答えが終わったら通知する(このブラウザの設定)</label>
+    <span id="通知案内" class="淡 小字" hidden></span>
     <div class="行" id="更新欄" hidden>
       <button id="再起動" type="button" class="小">🔄 最新にして再起動</button>
       <span id="更新状態" class="淡 小字"></span>
@@ -134,6 +136,7 @@
 </div>
 <script src="書式.js"></script>
 <script src="道.js"></script>
+<script src="通知.js"></script>
 <script src="動き.js"></script>
 <script src="頁.js"></script>
 <script src="添付.js"></script>
