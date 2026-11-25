@@ -1245,7 +1245,7 @@ function 通知欄表示(案内) {
   $("通知").disabled = !使える;
   $("通知").checked = 通知中();
   let 文 = 案内 || "";
-  if (!使える) 文 = "通知は、localhost か https で開いたときだけ使えます(ほかの機械から http で開くと使えません)。タブの題の印は付きます";
+  if (!使える) 文 = "通知は、localhost か https で開いたときだけ使えます(ほかの機械から http で開くと使えません)。Tailscale Serve で https にできます(README の「ほかの機械から https で開く」)。タブの題の印は付きます";
   else if (保存値("通知", "") === "1" && Notification.permission === "denied") 文 = "ブラウザが、このページの通知を止めています。ブラウザの設定で、このサイトの通知を許してください";
   $("通知案内").textContent = 文;
   $("通知案内").hidden = !文;
