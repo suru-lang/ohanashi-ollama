@@ -29,7 +29,7 @@ A web app for chatting in the browser with LLMs from [Ollama](https://ollama.com
 Requirements:
 
 - [Ollama](https://ollama.com/download) and at least one model (`ollama pull llama3.2` and so on)
-- Suru 0.4.0 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
+- Suru 0.9.0 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
 - libsqlite3 and OpenSSL (`kumu` shows how to install them if missing)
   - macOS: `brew install sqlite openssl@3` and `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian, Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
