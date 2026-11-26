@@ -7,7 +7,7 @@
 許可 とは 「o/r」 と 「p/*」
 
 道具試験する は 真偽 を 返す 入出力動作
-道具試験する とは 入出力手順
+道具試験する とは 以下の入出力手順です
   読群 とは 「[{"repo":"o/r","write":false}]」 を 許可 で GitHub道具内の倉群読取する
   書群 とは 「[{"repo":"o/r","write":false},{"repo":"p/x","write":true}]」 を 許可 で GitHub道具内の倉群読取する
   （（空 を GitHub作業内の作業道具定義作成する） の 長さ） を 0 に 一致確認する
@@ -15,9 +15,10 @@
   （（読群 を GitHub作業内の作業道具定義作成する） の 長さ） を 1 に 一致確認する
   （（書群 を GitHub作業内の作業道具定義作成する） の 長さ） を 2 に 一致確認する
   （（「github_clone」 が GitHub作業内の作業道具名である） かつ （「github_push」 が GitHub作業内の作業道具名である） かつ （「github_pr」 が GitHub作業内の作業道具名でない）） を 確認する
+  以上です
 
 枝試験する は 真偽 を 返す 入出力動作
-枝試験する とは 入出力手順
+枝試験する とは 以下の入出力手順です
   （「ohanashi/fix-typo」 が GitHub作業内の枝形違いである） を 偽 に 一致確認する
   （「feature_1.2」 が GitHub作業内の枝形違いである） を 偽 に 一致確認する
   （「」 が GitHub作業内の枝形違いである） を 確認する
@@ -28,10 +29,12 @@
   （「a/」 が GitHub作業内の枝形違いである） を 確認する
   （「a.lock」 が GitHub作業内の枝形違いである） を 確認する
   （「直す」 が GitHub作業内の枝形違いである） を 確認する
+  以上です
 
 押出試験する は 真偽 を 返す 入出力動作
-押出試験する とは 入出力手順
+押出試験する とは 以下の入出力手順です
   （「cd /work/r && git push -u origin ohanashi/x」 を GitHub作業内の押出枝抽出する） を 「ohanashi/x」 に 一致確認する
   （「git push origin HEAD:refs/heads/fix && echo ok」 を GitHub作業内の押出枝抽出する） を 「fix」 に 一致確認する
   （「git push」 を GitHub作業内の押出枝抽出する） を 「」 に 一致確認する
   （「git push --set-upstream origin」 を GitHub作業内の押出枝抽出する） を 「」 に 一致確認する
+  以上です
