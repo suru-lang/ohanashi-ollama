@@ -29,7 +29,7 @@ A web app for chatting in the browser with LLMs from [Ollama](https://ollama.com
 Requirements:
 
 - [Ollama](https://ollama.com/download) and at least one model (`ollama pull llama3.2` and so on)
-- Suru 0.4.0 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
+- Suru 0.9.1 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
 - libsqlite3 and OpenSSL (`kumu` shows how to install them if missing)
   - macOS: `brew install sqlite openssl@3` and `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian, Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
@@ -533,6 +533,11 @@ Streamed answers are individual JSON objects: `{"content":…}` (more of the ans
 1. **TLS is left to Tailscale Serve.** The http library's HTTPS is client only; there is no server TLS. Sockets of する's 「通信」 aren't OS fds, so making server TLS would need work in both the core and the http library. Opening from other machines is mostly done with Tailscale, so Tailscale Serve, which prepares and renews certificates, sits in front (#75, #76).
 2. **Origin can be http or https.** Tailscale Serve passes the Host as it is, so when opened over https, `Origin` is `https://` + Host. If `Origin` is `http://` + Host or `https://` + Host, it is accepted; other sites are refused as before.
 3. **WebSocket comes from the page's URL.** The page makes the WebSocket URL by changing `http` in `location.href` to `ws`, so opening over https gives `wss://`.
+
+### Suru 0.9.1
+
+1. **Suru 0.9.1 or later is required.** The libraries it uses, http 0.7.0 and sqlite 0.4.0, write their C functions with 「以下は外部の入出力動作です … 以上です」, which Suru 0.9.1 introduced. A `kumu` older than that can't build them.
+2. **The sandbox's C function is written on one line.** The two lines of type declaration and definition are now `s を 命令渡しする とは 外部の「system」 で 文字列 を 受け取って 整数 を 返す 入出力動作です`, so the name appears once. With only one C function, there is no need for a 「以下は外部の入出力動作です」 block.
 
 ## Future candidates
 

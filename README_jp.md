@@ -29,7 +29,7 @@
 要るもの:
 
 - [Ollama](https://ollama.com/download) と、モデルを1つ以上(`ollama pull llama3.2` など)
-- する 本体 0.4.0 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
+- する 本体 0.9.1 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
 - libsqlite3 と OpenSSL(`kumu` が足りなければ入れ方を出します)
   - macOS: `brew install sqlite openssl@3` と `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian・Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
@@ -533,6 +533,11 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 1. **TLS は Tailscale Serve に任せる。** http ライブラリの HTTPS はクライアントだけで、サーバーの TLS はありません。する の「通信」のソケットは OS の fd ではないので、サーバーの TLS を作るには本体と http ライブラリの両方に手が要ります。ほかの機械から開くのは Tailscale を使うことが多いので、証明書の用意も更新もしてくれる Tailscale Serve を前に置くことにしました(#75・#76)。
 2. **Origin は http と https のどちらでも。** Tailscale Serve は Host をそのまま渡すので、https で開くと `Origin` が `https://` + Host になります。`Origin` が `http://` + Host か `https://` + Host なら受け付け、ほかのサイトからは今のとおり断ります。
 3. **WebSocket は画面の URL から。** 画面は `location.href` の `http` を `ws` に変えて WebSocket の URL を作るので、https で開けば `wss://` になります。
+
+### する 0.9.1
+
+1. **する 0.9.1 以上が要る。** 使うライブラリの http 0.7.0 と sqlite 0.4.0 が、C の関数を 0.9.1 で入った「以下は外部の入出力動作です … 以上です」で書いているためです。それより古い `kumu` では組めません。
+2. **砂場の C の関数は1行で書く。** 型の宣言と定義の2行を `s を 命令渡しする とは 外部の「system」 で 文字列 を 受け取って 整数 を 返す 入出力動作です` の1行にして、名前を1回で済ませました。C の関数は1つだけなので、「以下は外部の入出力動作です」のまとまりにはしません。
 
 ## 今後の候補
 
