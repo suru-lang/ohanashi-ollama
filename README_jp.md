@@ -29,7 +29,7 @@
 要るもの:
 
 - [Ollama](https://ollama.com/download) と、モデルを1つ以上(`ollama pull llama3.2` など)
-- する 本体 0.4.0 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
+- する 本体 0.9.0 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
 - libsqlite3 と OpenSSL(`kumu` が足りなければ入れ方を出します)
   - macOS: `brew install sqlite openssl@3` と `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian・Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
