@@ -3,11 +3,12 @@
 「ohanashi-ollama/設定」 を 読み込んで 使う
 
 基点試験する は 真偽 を 返す 入出力動作
-基点試験する とは 入出力手順
+基点試験する とは 以下の入出力手順です
   （「」 を 基点にする） を 「http://localhost:11434」 に 一致確認する
   （「http://example:11434/」 を 基点にする） を 「http://example:11434」 に 一致確認する
   （「127.0.0.1:11500」 を 基点にする） を 「http://127.0.0.1:11500」 に 一致確認する
   （「0.0.0.0」 を 基点にする） を 「http://127.0.0.1:11434」 に 一致確認する
+  以上です
 
 既定 とは 基点 は 「http://localhost:11434」 で 待受 は 「127.0.0.1」 で ポート は 8080 で 帳 は 「ohanashi.db」 で 画面 は 「画面」 で SearXNG は 「」 で 検索鍵 は 「」 で 検索先 は 既定検索先 で 砂像 は 既定砂像 で 砂網 は 「none」 で 作業 は 「作業」 で 制御 は 「」 で 改訂 は 「」 で 起動時 は 0 で GitHub鍵 は 「」 で GitHub倉群 は 空 で GitHub基点 は 既定GitHub基点 で GitHub利用者 は 「」 で Git基点 は 「」 で Git作者 は 「」 で 調べ指名 は 「」 で 調べ上限 は 0 で 調べ可 は 真 で 文書可 は 偽 の 設定
 
@@ -16,7 +17,7 @@
 （e という 失敗） を 説明にする とは 「失敗: 」 + e
 
 引数試験する は 真偽 を 返す 入出力動作
-引数試験する とは 入出力手順
+引数試験する とは 以下の入出力手順です
   （空 を 既定 で 引数解釈して 説明にする） を 「http://localhost:11434 8080 ohanashi.db 画面 https://ollama.com/api/web_search  python:3.12-slim none 作業  」 に 一致確認する
   （（「--port」 と 「9000」 と 「--ollama」 と 「192.168.1.5:11434」 と 「--db」 と 「/tmp/a.db」 と 「--screen」 と 「x」 と 「--web-search」 と 「http://localhost:11435/api/web_search」 と 「--searxng」 と 「http://localhost:8888/」 と 「--sandbox-image」 と 「node:22」 と 「--sandbox-network」 と 「bridge」 と 「--work」 と 「/tmp/w/」 と 「--control」 と 「出力/制御/」 と 「--revision」 と 「abc1234」） を 既定 で 引数解釈して 説明にする） を 「http://192.168.1.5:11434 9000 /tmp/a.db x http://localhost:11435/api/web_search http://localhost:8888 node:22 bridge /tmp/w 出力/制御 abc1234」 に 一致確認する
   （（（「--port」 と 「abc」） を 既定 で 引数解釈して 説明にする） が 「失敗: 」 で 先頭一致である） を 確認する
@@ -31,18 +32,20 @@
   調 の 調べ上限 を 24 に 一致確認する
   （調 の 調べ可 = 偽） を 確認する
   （（既定 の 調べ可） = 真） を 確認する
+  以上です
 
 倉列試験する は 真偽 を 返す 入出力動作
-倉列試験する とは 入出力手順
+倉列試験する とは 以下の入出力手順です
   （「 o/r, p/* ,」 を 倉列分解する） を （（「o/r」 と 「p/*」） の 成功） に 一致確認する
   （「o/r,bad,/x」 を 倉列分解する） を （「--github-repos は owner/名前 か owner/* をカンマで並べます: bad,/x」 の 失敗） に 一致確認する
   r とは （「--github-repos」 と 「o/r,p/*」 と 「--github-token」 と 「鍵」 と 「--github-api」 と 「http://127.0.0.1:9/」） を 既定 で 引数解釈する
   もし r が
     s という 成功 ならば （（s の GitHub倉群 を 「,」 で 結合する） + 「 」 + s の GitHub鍵 + 「 」 + s の GitHub基点） を 「o/r,p/* 鍵 http://127.0.0.1:9」 に 一致確認する
     e という 失敗 ならば e を 不合格にする
+  以上です
 
 Git試験する は 真偽 を 返す 入出力動作
-Git試験する とは 入出力手順
+Git試験する とは 以下の入出力手順です
   （既定 を Git基点決定する） を 「https://github.com」 に 一致確認する
   （（GitHub基点 は 「https://ghe.example/api/v3」 の 既定） を Git基点決定する） を 「https://ghe.example」 に 一致確認する
   （（Git基点 は 「file:///tmp/裸」 の 既定） を Git基点決定する） を 「file:///tmp/裸」 に 一致確認する
@@ -51,3 +54,4 @@ Git試験する とは 入出力手順
     s という 成功 ならば （s の Git基点 + 「 」 + s の Git作者） を 「file:///tmp/裸 試し <t@example.com>」 に 一致確認する
     e という 失敗 ならば e を 不合格にする
   （（「--git-author」 と 「試し」） を 既定 で 引数解釈する） を （「--git-author は『名前 <メール>』の形で書きます」 の 失敗） に 一致確認する
+  以上です
