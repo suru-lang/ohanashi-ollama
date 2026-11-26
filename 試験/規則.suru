@@ -34,15 +34,15 @@
 読取試験する は 砂場内の実行結果 を 返す 入出力動作
 読取試験する とは 以下の入出力手順です
   場 とは 「/tmp/ohanashi-決まり試験」
-  （「(rm -rf 」 + 場 + 「 && mkdir -p 」 + 場 + 「/a/.git 」 + 場 + 「/b/.git 」 + 場 + 「/c 」 + 場 + 「/.git && printf 'A の決まり\n二行目\n' > 」 + 場 + 「/a/AGENTS.md && printf 'C' > 」 + 場 + 「/a/CLAUDE.md && printf 'O' > 」 + 場 + 「/a/OHANASHI.md && printf 'B' > 」 + 場 + 「/b/CLAUDE.md && printf 'git でない' > 」 + 場 + 「/c/AGENTS.md && printf '頂' > 」 + 場 + 「/AGENTS.md)」） を 「ohanashi-決まり試験-用意」 で 砂場内の命令出力取得する
-  群 とは 場 を 「ohanashi-決まり試験」 で 規則内の倉決まり読取した 結果
+  （「(rm -rf 」 + 場 + 「 && mkdir -p 」 + 場 + 「/a/.git 」 + 場 + 「/b/.git 」 + 場 + 「/c 」 + 場 + 「/.git && printf 'A の決まり\n二行目\n' > 」 + 場 + 「/a/AGENTS.md && printf 'C' > 」 + 場 + 「/a/CLAUDE.md && printf 'O' > 」 + 場 + 「/a/OHANASHI.md && printf 'B' > 」 + 場 + 「/b/CLAUDE.md && printf 'git でない' > 」 + 場 + 「/c/AGENTS.md && printf '頂' > 」 + 場 + 「/AGENTS.md)」） を 砂場内の命令出力取得する
+  群 とは 場 を 規則内の倉決まり読取した 結果
   （群 を 規則内の倉決まり一覧にする） を 「AGENTS.md・a/OHANASHI.md・b/CLAUDE.md」 に 一致確認する
   （（群 の 先頭） の 内容 を 空白除去する） を 「頂」 に 一致確認する
   # OHANASHI.md がなければ AGENTS.md
-  （「rm 」 + 場 + 「/a/OHANASHI.md」） を 「ohanashi-決まり試験-用意」 で 砂場内の命令出力取得する
-  二 とは 場 を 「ohanashi-決まり試験」 で 規則内の倉決まり読取した 結果
+  （「rm 」 + 場 + 「/a/OHANASHI.md」） を 砂場内の命令出力取得する
+  二 とは 場 を 規則内の倉決まり読取した 結果
   （（二 から 2 を 番目取得する） の 内容 を 空白除去する） を 「A の決まり」 + 改行 + 「二行目」 に 一致確認する
   # 作業フォルダがなければ空
-  （（（場 + 「/ない」） を 「ohanashi-決まり試験」 で 規則内の倉決まり読取した 結果） の 長さ） を 0 に 一致確認する
-  （「rm -rf 」 + 場） を 「ohanashi-決まり試験-用意」 で 砂場内の命令出力取得する
+  （（（場 + 「/ない」） を 規則内の倉決まり読取した 結果） の 長さ） を 0 に 一致確認する
+  （「rm -rf 」 + 場） を 砂場内の命令出力取得する
   以上です
