@@ -29,7 +29,7 @@
 要るもの:
 
 - [Ollama](https://ollama.com/download) と、モデルを1つ以上(`ollama pull llama3.2` など)
-- する 本体 0.4.0 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
+- する 本体 0.9.1 以上(`kumu` と clang)。入れ方は [する の README](https://github.com/suru-lang/suru#入れ方)
 - libsqlite3 と OpenSSL(`kumu` が足りなければ入れ方を出します)
   - macOS: `brew install sqlite openssl@3` と `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian・Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
@@ -403,7 +403,7 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 3. **道具は2つだけ。** `run`(sh -c)と `write_file` です。ファイルを読むのは `run` で `cat` できるので、道具を少なくしてモデルが迷わないようにしました。
 4. **道具のくり返しはサーバーで。** モデルが `tool_calls` を返したら、サーバーが順に行い、`role: "assistant"`(呼び出し)と `role: "tool"`(結果)の発言を足して、もう一度 `/api/chat` に送ります。道具を呼ばなくなるか、30 回になるまでくり返します(はじめは 10 回でしたが、clone・変更・確認・push・PR と続けると届いてしまったため)。上限で止めたときは、「続けて」と送れば続きをします。
 5. **使った跡は答えといっしょに保存する。** 画面は `tool` を受け取ったら、書いたファイルとコマンドの出力を Markdown のコードの塊(`~~~~` で囲む)として答えに足し、その全体を保存します。次の問いのときには、モデルにも前に動かしたことが見えます。途中の `tool` の発言そのものは保存しません。
-6. **「プロセス」を使わない。** 標準の「プロセス」と「ファイル」(http ライブラリが読み込む)が C の `fread` を違う型で宣言していて、いっしょに読み込めません。そのため砂場は `system` と一時ファイルでコマンドを動かします。
+6. **コマンドは「プロセス」で動かす。** 標準の「プロセス」の `命令出力取得する`・`命令変換する`・`命令実行する` を使い、出力には標準エラー出力もまとめます(`(命令) 2>&1`)。前は「プロセス」と「ファイル」(http ライブラリが読み込む)が C の `fread` を違う型で宣言していていっしょに読み込めず、`system` と `/tmp` の一時ファイルで動かしていました。する 0.7.0 で直ったので(suru-lang/suru#120)、「プロセス」にしました。出力を popen で読むので一時ファイルが要らず、同じ名前の一時ファイルを2つの要求が同時に使うこともなくなりました。
 7. **ネットワークは会話ごとに選ぶ。** 会話の `network` が真なら `bridge`、偽なら `--sandbox-network` の値(既定 `none`)でコンテナを作ります。コンテナが動いていても、`docker inspect` で見たネットワークが違えば作り直します。会話帳の表に `網` の列がない(前の版で作った)ときは、起動したときに `ALTER TABLE` で足します。
 
 ### 起動.sh
@@ -533,6 +533,11 @@ kumu 実行 -- --ollama http://localhost:11435 --searxng http://localhost:11435 
 1. **TLS は Tailscale Serve に任せる。** http ライブラリの HTTPS はクライアントだけで、サーバーの TLS はありません。する の「通信」のソケットは OS の fd ではないので、サーバーの TLS を作るには本体と http ライブラリの両方に手が要ります。ほかの機械から開くのは Tailscale を使うことが多いので、証明書の用意も更新もしてくれる Tailscale Serve を前に置くことにしました(#75・#76)。
 2. **Origin は http と https のどちらでも。** Tailscale Serve は Host をそのまま渡すので、https で開くと `Origin` が `https://` + Host になります。`Origin` が `http://` + Host か `https://` + Host なら受け付け、ほかのサイトからは今のとおり断ります。
 3. **WebSocket は画面の URL から。** 画面は `location.href` の `http` を `ws` に変えて WebSocket の URL を作るので、https で開けば `wss://` になります。
+
+### する 0.9.1
+
+1. **する 0.9.1 以上が要る。** 使うライブラリの http 0.7.0 と sqlite 0.4.0 が、C の関数を 0.9.1 で入った「以下は外部の入出力動作です … 以上です」で書いているためです。それより古い `kumu` では組めません。
+2. **アプリには C の関数がない。** 砂場で使っていた `system` は、標準の「プロセス」に置きかえました(「砂場」)。C の関数を呼ぶのはライブラリの中だけです。
 
 ## 今後の候補
 

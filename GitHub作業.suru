@@ -95,7 +95,7 @@ c で 名 を 鍵前置作成する とは
 
 作業文脈 で 文字列 を 鍵書出する は 文字列 を 返す 入出力動作
 c で 名 を 鍵書出する とは 以下の入出力手順です
-  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 「ohanashi-鍵場」 で 砂場内の命令出力取得する
+  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 砂場内の命令出力取得する
   f とは c の 鍵場 + 「/git-」 + 名
   （「T=」 + （c の 鍵 を 砂場内の引用する） + 改行） を f へ ファイル内の書出する
   （「export GIT_TERMINAL_PROMPT=0; . 」 + （f を 砂場内の引用する） + 「; rm -f 」 + （f を 砂場内の引用する） + 「; H=$(printf 'x-access-token:%s' "$T" | base64 | tr -d '[:space:]'); unset T; export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0="Authorization: Basic $H"; 」） を 結果にする
@@ -114,7 +114,7 @@ c で x を 参照 から 改 へ 複製実行する とは 以下の入出力�
 c で x を 参照 から 改 へ 複製する とは 以下の入出力手順です
   場 とは c で x の 倉 を 場所にする
   短 とは x の 倉 を 倉短名にする
-  有無 とは （「test -e 」 + （場 を 砂場内の引用する）） を 「ohanashi-git-有無」 で 砂場内の命令出力取得した 結果
+  有無 とは （「test -e 」 + （場 を 砂場内の引用する）） を 砂場内の命令出力取得した 結果
   もし 有無 の 終了コード ≠ 0 ならば c で x を 参照 から 新規複製する
   そうでなければ もし 改 ならば c で x を 参照 から 移して複製する
   そうでなければ （「github_clone」 で （「🐙 」 + x の 倉 + 「 は /work/」 + 短 + 「 に clone してあります」） を （「/work/」 + 短 + 「 is already there (cloned before). Change files there, then call github_push. If its history is not from this repository (for example github_pr says the branch has no history in common), call github_clone with fresh true.」） から GitHub道具内の道具結果にする） の 成功 を 結果にする
@@ -123,7 +123,7 @@ c で x を 参照 から 改 へ 複製する とは 以下の入出力手順�
 作業文脈 で GitHub道具内の倉許可 を 文字列 から 移して複製する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
 c で x を 参照 から 移して複製する とは 以下の入出力手順です
   場引 とは （c で x の 倉 を 場所にする） を 砂場内の引用する
-  m とは （「d=」 + 場引 + 「.old-$(date +%Y%m%d%H%M%S) && mv 」 + 場引 + 「 "$d" && basename "$d"」） を 「ohanashi-git-移動」 で 砂場内の命令出力取得した 結果
+  m とは （「d=」 + 場引 + 「.old-$(date +%Y%m%d%H%M%S) && mv 」 + 場引 + 「 "$d" && basename "$d"」） を 砂場内の命令出力取得した 結果
   旧 とは （m の 出力 を 空白除去する） を 最終行にする
   もし m の 終了コード ≠ 0 ならば （「前の clone を移せませんでした: 」 + （m の 出力 を 空白除去する）） の 失敗 を 結果にする
   そうでなければ （c で x を 参照 から 新規複製した 結果） を 旧 で 旧注付加する
@@ -151,7 +151,7 @@ c で x を 参照 から 新規複製する とは 以下の入出力手順で�
   枝 とは もし 参照 = 「」 ならば 「」 そうでなければ 「--branch 」 + （参照 を 砂場内の引用する） + 「 」
   場引 とは 場 を 砂場内の引用する
   命令 とは 「(mkdir -p 」 + （c の 作業 を 砂場内の引用する） + 「 && (」 + 前 + 「git clone -q --depth 1 」 + 枝 + 「-- 」 + （（c の git基点 + 「/」 + x の 倉 + 「.git」） を 砂場内の引用する） + 「 」 + 場引 + 「) && git -C 」 + 場引 + 「 config user.name 」 + （c の 作者名 を 砂場内の引用する） + 「 && git -C 」 + 場引 + 「 config user.email 」 + （c の 作者メール を 砂場内の引用する） + 「 && git -C 」 + 場引 + 「 symbolic-ref --short HEAD && { git -C 」 + 場引 + 「 rev-parse -q --verify HEAD >/dev/null || echo ohanashi-empty; })」
-  r とは 命令 を 「ohanashi-git-clone」 で 砂場内の命令出力取得した 結果
+  r とは 命令 を 砂場内の命令出力取得した 結果
   出 とは r の 出力 を 空白除去する
   枝名 とは 出 を 枝名抽出する
   もし r の 終了コード ≠ 0 ならば （「clone できませんでした: 」 + 出） の 失敗 を 結果にする
@@ -197,7 +197,7 @@ c で x に 枝 を 文 より 場 から 既定枝確認する とは 以下の
 作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 より 文字列 から 送出する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
 c で x に 枝 を 文 より 場 から 送出する とは 以下の入出力手順です
   短 とは x の 倉 を 倉短名にする
-  有無 とは （「test -d 」 + （（場 + 「/.git」） を 砂場内の引用する）） を 「ohanashi-git-有無」 で 砂場内の命令出力取得した 結果
+  有無 とは （「test -d 」 + （（場 + 「/.git」） を 砂場内の引用する）） を 砂場内の命令出力取得した 結果
   もし 有無 の 終了コード ≠ 0 ならば （「/work/」 + 短 + 「 がありません。先に github_clone で clone してください」） の 失敗 を 結果にする
   そうでなければ c で x に 枝 を 文 より 場 から 送出実施する
   以上です
@@ -205,14 +205,14 @@ c で x に 枝 を 文 より 場 から 送出する とは 以下の入出力
 作業文脈 で GitHub道具内の倉許可 に 文字列 を 文字列 より 文字列 から 送出実施する は （砂場内の道具結果 と 文字列） の 成否 を 返す 入出力動作
 c で x に 枝 を 文 より 場 から 送出実施する とは 以下の入出力手順です
   短 とは x の 倉 を 倉短名にする
-  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 「ohanashi-鍵場」 で 砂場内の命令出力取得する
+  （「mkdir -p 」 + （c の 鍵場 を 砂場内の引用する） + 「 && chmod 700 」 + （c の 鍵場 を 砂場内の引用する）） を 砂場内の命令出力取得する
   文道 とは c の 鍵場 + 「/msg-」 + 短
   （（文 に （c の 署名） を GitHub道具内の署名付加する） + 改行） を 文道 へ ファイル内の書出する
   前 とは c で 「push」 を 鍵前置作成した 結果
   g とは 「git -C 」 + （場 を 砂場内の引用する） + 「 」
   命令 とは 「(」 + g + 「checkout -q -B 」 + （枝 を 砂場内の引用する） + 「 && 」 + g + 「add -A && { 」 + g + 「diff --cached --quiet || 」 + g + 「-c core.hooksPath=/dev/null -c user.name=」 + （c の 作者名 を 砂場内の引用する） + 「 -c user.email=」 + （c の 作者メール を 砂場内の引用する） + 「 commit -q -F - < 」 + （文道 を 砂場内の引用する） + 「; } && n=$(」 + g + 「rev-list --count HEAD --not --remotes) && if [ "$n" = 0 ]; then echo 'ohanashi: nothing to push'; exit 3; fi && 」 + g + 「log -1 --format=%h && 」 + g + 「show --shortstat --format= HEAD && (」 + 前 + g + 「push -q 」 + （（c の git基点 + 「/」 + x の 倉 + 「.git」） を 砂場内の引用する） + 「 HEAD:refs/heads/」 + （枝 を 砂場内の引用する） + 「) && 」 + g + 「update-ref refs/remotes/origin/」 + （枝 を 砂場内の引用する） + 「 HEAD)」
-  r とは 命令 を 「ohanashi-git-push」 で 砂場内の命令出力取得した 結果
-  （「rm -f 」 + （文道 を 砂場内の引用する）） を 「ohanashi-git-rm」 で 砂場内の命令出力取得する
+  r とは 命令 を 砂場内の命令出力取得した 結果
+  （「rm -f 」 + （文道 を 砂場内の引用する）） を 砂場内の命令出力取得する
   行群 とは （r の 出力 を 空白除去して 改行 で 分割する） の それぞれ を 空白除去する
   印 とは もし 行群 が 空 ならば 「」 そうでなければ 行群 の 先頭
   量 とは もし 行群 の 長さ < 2 ならば 「」 そうでなければ 行群 から 2 を 番目取得する
@@ -234,7 +234,7 @@ c で 場 を 中表示する とは もし 場 = c の 作業 ならば 「/wor
 
 作業文脈 で 文字列 を git送出代行する は 砂場内の道具結果 を 返す 入出力動作
 c で 命令 を git送出代行する とは 以下の入出力手順です
-  一覧 とは （「cd 」 + （c の 作業 を 砂場内の引用する） + 「 2>/dev/null && for d in . */; do if [ -d "$d/.git" ]; then echo "${d%/}|$(git -C "$d" remote get-url origin 2>/dev/null)|$(git -C "$d" symbolic-ref --short HEAD 2>/dev/null)"; fi; done」） を 「ohanashi-git-一覧」 で 砂場内の命令出力取得した 結果
+  一覧 とは （「cd 」 + （c の 作業 を 砂場内の引用する） + 「 2>/dev/null && for d in . */; do if [ -d "$d/.git" ]; then echo "${d%/}|$(git -C "$d" remote get-url origin 2>/dev/null)|$(git -C "$d" symbolic-ref --short HEAD 2>/dev/null)"; fi; done」） を 砂場内の命令出力取得した 結果
   群 とは （（一覧 の 出力 を 改行 で 分割する） の それぞれ を 候補場にする） から （y を 受け取って （（y の 場名 ≠ 「」） かつ （c で y が 倉候補である）） を 返すこと） で 選別する
   指名 とは 群 から （y を 受け取って （命令 が （「/work/」 + y の 場名） を 含有である または 命令 が （「cd 」 + y の 場名） を 含有である） を 返すこと） で 選別する
   選 とは もし 指名 の 長さ = 1 ならば 指名 そうでなければ 群

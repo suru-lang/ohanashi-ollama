@@ -1,4 +1,4 @@
 名前 とは 「ohanashi-ollama」
 版 とは 「0.1.0」
 入口 とは 「本体」
-依存 とは 「github.com/suru-lang/http@0.6.0」 と 「github.com/suru-lang/sqlite@0.3.0」 と 「github.com/suru-lang/github@0.1.0」 と 「github.com/suru-lang/ollama@0.2.0」
+依存 とは 「github.com/suru-lang/http@0.7.0」 と 「github.com/suru-lang/sqlite@0.4.0」 と 「github.com/suru-lang/github@0.1.0」 と 「github.com/suru-lang/ollama@0.2.0」

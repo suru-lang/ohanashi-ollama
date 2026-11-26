@@ -29,7 +29,7 @@ A web app for chatting in the browser with LLMs from [Ollama](https://ollama.com
 Requirements:
 
 - [Ollama](https://ollama.com/download) and at least one model (`ollama pull llama3.2` and so on)
-- Suru 0.4.0 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
+- Suru 0.9.1 or later (`kumu` and clang). See the [Suru README](https://github.com/suru-lang/suru#installing) for installation
 - libsqlite3 and OpenSSL (`kumu` shows how to install them if missing)
   - macOS: `brew install sqlite openssl@3` and `export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig:$(brew --prefix openssl@3)/lib/pkgconfig"`
   - Debian, Ubuntu: `sudo apt install libsqlite3-dev libssl-dev`
@@ -403,7 +403,7 @@ Streamed answers are individual JSON objects: `{"content":…}` (more of the ans
 3. **Only two tools.** `run` (sh -c) and `write_file`. Reading a file can be done with `cat` in `run`, so tools are kept few so the model doesn't get confused.
 4. **The server repeats the tool loop.** When the model returns `tool_calls`, the server carries them out in order, adds `role: "assistant"` (the calls) and `role: "tool"` (the results) messages, and sends to `/api/chat` again. This repeats until the model stops calling tools or reaches 30 times (it was 10 at first, but cloning, changing, checking, pushing and making a PR in a row reached it). When it stops at the limit, sending "続けて" ("continue") continues.
 5. **Traces are saved with the answer.** When the page receives `tool`, it adds the written files and command output to the answer as Markdown code blocks (in `~~~~`) and saves the whole thing. With the next question, the model also sees what ran before. The intermediate `tool` messages themselves aren't saved.
-6. **It doesn't use 「プロセス」.** The standard 「プロセス」 and 「ファイル」 (loaded by the http library) declare C's `fread` with different types and can't be loaded together. So the sandbox runs commands with `system` and a temporary file.
+6. **Commands run with 「プロセス」.** It uses `命令出力取得する`, `命令変換する` and `命令実行する` of the standard 「プロセス」, and the output includes standard error (`(命令) 2>&1`). Before, 「プロセス」 and 「ファイル」 (loaded by the http library) declared C's `fread` with different types and couldn't be loaded together, so commands ran with `system` and a temporary file in `/tmp`. Suru 0.7.0 fixed that (suru-lang/suru#120), so it now uses 「プロセス」. Output is read through popen, so no temporary file is needed, and two requests can no longer use a temporary file of the same name at the same time.
 7. **The network is chosen per conversation.** If the conversation's `network` is true, the container is made with `bridge`; if false, with the value of `--sandbox-network` (default `none`). Even if the container is running, it is remade if the network seen by `docker inspect` differs. When the conversation table has no `網` column (made by an earlier version), it is added with `ALTER TABLE` at startup.
 
 ### 起動.sh
@@ -533,6 +533,11 @@ Streamed answers are individual JSON objects: `{"content":…}` (more of the ans
 1. **TLS is left to Tailscale Serve.** The http library's HTTPS is client only; there is no server TLS. Sockets of する's 「通信」 aren't OS fds, so making server TLS would need work in both the core and the http library. Opening from other machines is mostly done with Tailscale, so Tailscale Serve, which prepares and renews certificates, sits in front (#75, #76).
 2. **Origin can be http or https.** Tailscale Serve passes the Host as it is, so when opened over https, `Origin` is `https://` + Host. If `Origin` is `http://` + Host or `https://` + Host, it is accepted; other sites are refused as before.
 3. **WebSocket comes from the page's URL.** The page makes the WebSocket URL by changing `http` in `location.href` to `ws`, so opening over https gives `wss://`.
+
+### Suru 0.9.1
+
+1. **Suru 0.9.1 or later is required.** The libraries it uses, http 0.7.0 and sqlite 0.4.0, write their C functions with 「以下は外部の入出力動作です … 以上です」, which Suru 0.9.1 introduced. A `kumu` older than that can't build them.
+2. **The app has no C functions.** The `system` used by the sandbox was replaced with the standard 「プロセス」 (see "Sandbox"). Only the libraries call C functions.
 
 ## Future candidates
 
